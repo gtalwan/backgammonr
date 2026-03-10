@@ -1,6 +1,6 @@
 # backgammonr
 
-`backgammonr` is an R package for finite-budget Monte Carlo action evaluation
+`backgammonr` is an Rcpp package for finite-budget Monte Carlo action evaluation
 in backgammon. It treats a single board state plus a realized dice roll as a
 ranking-and-selection problem under simulation noise:
 
