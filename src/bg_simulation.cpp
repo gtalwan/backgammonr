@@ -1,49 +1,89 @@
 // LINE NOTE: #include "bg_simulation.h"
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_simulation.h"
 // LINE NOTE: // This translation unit implements the multi-game simulation layer that
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // This translation unit implements the multi-game simulation layer that
 // LINE NOTE: // aggregates per-game stochastic outcomes into study-ready summary tables.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // aggregates per-game stochastic outcomes into study-ready summary tables.
 
 // LINE NOTE: #include <algorithm>
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <algorithm>
 // LINE NOTE: #include <cstdint>
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <cstdint>
 // LINE NOTE: #include <random>
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <random>
 // LINE NOTE: #include <sstream>
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <sstream>
 // LINE NOTE: #include <stdexcept>
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <stdexcept>
 // LINE NOTE: #include <string>
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <string>
 // LINE NOTE: #include <vector>
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <vector>
 
 // LINE NOTE: #include "bg_game.h"
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_game.h"
 // LINE NOTE: #include "bg_movegen.h"
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_movegen.h"
 // LINE NOTE: #include "bg_rules.h"
+// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
+// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_rules.h"
 
 // LINE NOTE: namespace {
+// **WHAT IT'S DOING:** Opens a namespace scope so related symbols stay organized and do not collide with similarly named code elsewhere.
+// **IN PLAIN ENGLISH:** This creates a labeled section so names are easier to manage and safer to reuse.
 namespace {
 
 // LINE NOTE: // Reuse the engine's randomness predicate so scripted simulation can decide
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Reuse the engine's randomness predicate so scripted simulation can decide
 // LINE NOTE: // whether it needs an RNG at all.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // whether it needs an RNG at all.
 // LINE NOTE: bool selection_uses_randomness(const std::string& selection) {
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 bool selection_uses_randomness(const std::string& selection) {
   // LINE NOTE: return backgammonr::selection_uses_randomness(selection);
   return backgammonr::selection_uses_randomness(selection);
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Validate number of games argument.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Validate number of games argument.
 // LINE NOTE: void validate_n_games(const int n_games) {
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 void validate_n_games(const int n_games) {
   // LINE NOTE: if (n_games < 1) {
   if (n_games < 1) {
@@ -52,11 +92,17 @@ void validate_n_games(const int n_games) {
   // LINE NOTE: }
   }
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Validate per-game turn cap.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Validate per-game turn cap.
 // LINE NOTE: void validate_max_turns(const int max_turns) {
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 void validate_max_turns(const int max_turns) {
   // LINE NOTE: if (max_turns < 0) {
   if (max_turns < 0) {
@@ -65,11 +111,17 @@ void validate_max_turns(const int max_turns) {
   // LINE NOTE: }
   }
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Build deterministic or nondeterministic RNG depending on user arguments.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Build deterministic or nondeterministic RNG depending on user arguments.
 // LINE NOTE: std::mt19937 init_rng(const int seed, const bool use_seed) {
+// **WHAT IT'S DOING:** Creates a Mersenne Twister random-number generator used for reproducible stochastic simulation.
+// **IN PLAIN ENGLISH:** This is the randomness engine that drives rollouts and posterior sampling.
 std::mt19937 init_rng(const int seed, const bool use_seed) {
   // LINE NOTE: std::mt19937 rng;
   std::mt19937 rng;
@@ -96,11 +148,17 @@ std::mt19937 init_rng(const int seed, const bool use_seed) {
   // LINE NOTE: return rng;
   return rng;
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Parse list of scripted rolls from R into engine roll objects.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Parse list of scripted rolls from R into engine roll objects.
 // LINE NOTE: std::vector<backgammonr::DiceRoll> parse_roll_vector(const Rcpp::List& rolls) {
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::vector<backgammonr::DiceRoll> parse_roll_vector(const Rcpp::List& rolls) {
   // LINE NOTE: std::vector<backgammonr::DiceRoll> out;
   std::vector<backgammonr::DiceRoll> out;
@@ -130,11 +188,17 @@ std::vector<backgammonr::DiceRoll> parse_roll_vector(const Rcpp::List& rolls) {
   // LINE NOTE: return out;
   return out;
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Pick active selection rule based on whose turn it is.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Pick active selection rule based on whose turn it is.
 // LINE NOTE: const std::string& selection_for_player_unchecked(
+// **WHAT IT'S DOING:** Declares an immutable value to make intent explicit and prevent accidental mutation.
+// **IN PLAIN ENGLISH:** This locks a value so it cannot be changed later by mistake.
 const std::string& selection_for_player_unchecked(
     // LINE NOTE: const int player,
     const int player,
@@ -145,11 +209,17 @@ const std::string& selection_for_player_unchecked(
   // LINE NOTE: return player == 1 ? player1_selection : player2_selection;
   return player == 1 ? player1_selection : player2_selection;
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Convert winner code to stable user-facing label.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Convert winner code to stable user-facing label.
 // LINE NOTE: std::string winner_label(const int winner) {
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::string winner_label(const int winner) {
   // LINE NOTE: if (winner == 1) {
   if (winner == 1) {
@@ -168,11 +238,17 @@ std::string winner_label(const int winner) {
   // LINE NOTE: return "none";
   return "none";
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Fast path for pure random-policy turns (hot loop in simulations).
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Fast path for pure random-policy turns (hot loop in simulations).
 // LINE NOTE: void play_random_turn_with_roll_lightweight(
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 void play_random_turn_with_roll_lightweight(
     // LINE NOTE: backgammonr::BoardState& board,
     backgammonr::BoardState& board,
@@ -183,11 +259,17 @@ void play_random_turn_with_roll_lightweight(
   // LINE NOTE: (void) backgammonr::play_random_turn_rollout_fast(board, roll, rng);
   (void) backgammonr::play_random_turn_rollout_fast(board, roll, rng);
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Simulate one game with random dice.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Simulate one game with random dice.
 // LINE NOTE: backgammonr::SimulatedGameSummary simulate_one_game_random(
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 backgammonr::SimulatedGameSummary simulate_one_game_random(
     // LINE NOTE: const backgammonr::BoardState& initial_board,
     const backgammonr::BoardState& initial_board,
@@ -203,6 +285,14 @@ backgammonr::SimulatedGameSummary simulate_one_game_random(
     const std::string& player2_selection,
     // LINE NOTE: const backgammonr::RolloutConfig& rollout_config) {
     const backgammonr::RolloutConfig& rollout_config) {
+  // **WHAT IT'S DOING (DETAILED):**
+  // This function plays exactly one stochastic game trajectory.
+  // - It starts from a fixed board state.
+  // - Each turn chooses a policy based on whose turn it is.
+  // - It applies one move, checks terminal status, and records metadata.
+  // - It stops on game-over or turn budget exhaustion.
+  // **IN PLAIN ENGLISH:** Run one complete game simulation and record who won,
+  // how long it took, and whether we hit stopping limits.
   // LINE NOTE: backgammonr::SimulatedGameSummary out;
   backgammonr::SimulatedGameSummary out;
   // LINE NOTE: out.game_id = game_id;
@@ -225,6 +315,7 @@ backgammonr::SimulatedGameSummary simulate_one_game_random(
   backgammonr::BoardState current = initial_board;
   // LINE NOTE: for (int turn_index = 0; turn_index < max_turns; ++turn_index) {
   for (int turn_index = 0; turn_index < max_turns; ++turn_index) {
+    // One loop iteration = one full turn transition in the simulated game.
     // LINE NOTE: // Resolve selection policy for current player.
     // Resolve selection policy for current player.
     // LINE NOTE: const std::string& turn_selection =
@@ -233,6 +324,7 @@ backgammonr::SimulatedGameSummary simulate_one_game_random(
         selection_for_player_unchecked(current.turn, player1_selection, player2_selection);
     // LINE NOTE: if (turn_selection == "random") {
     if (turn_selection == "random") {
+      // Fast path: random policy can bypass some heavier policy machinery.
       // LINE NOTE: // Keep random-policy simulation lightweight.
       // Keep random-policy simulation lightweight.
       // LINE NOTE: play_random_turn_with_roll_lightweight(current, backgammonr::roll_dice(rng), rng);
@@ -266,6 +358,8 @@ backgammonr::SimulatedGameSummary simulate_one_game_random(
 
     // LINE NOTE: // Random turn path can finish game without TurnResult object.
     // Random turn path can finish game without TurnResult object.
+    // We still need a terminal check here because the fast path does not return
+    // an explicit `TurnResult` object carrying `game_over`.
     // LINE NOTE: if (backgammonr::board_is_terminal(current)) {
     if (backgammonr::board_is_terminal(current)) {
       // LINE NOTE: out.game_over = true;
@@ -284,11 +378,17 @@ backgammonr::SimulatedGameSummary simulate_one_game_random(
   // LINE NOTE: return out;
   return out;
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Simulate one game with scripted roll sequence.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Simulate one game with scripted roll sequence.
 // LINE NOTE: backgammonr::SimulatedGameSummary simulate_one_game_with_rolls(
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 backgammonr::SimulatedGameSummary simulate_one_game_with_rolls(
     // LINE NOTE: const backgammonr::BoardState& initial_board,
     const backgammonr::BoardState& initial_board,
@@ -306,6 +406,11 @@ backgammonr::SimulatedGameSummary simulate_one_game_with_rolls(
     std::mt19937* rng,
     // LINE NOTE: const backgammonr::RolloutConfig& rollout_config) {
     const backgammonr::RolloutConfig& rollout_config) {
+  // **WHAT IT'S DOING (DETAILED):** Same one-game simulation skeleton as the
+  // random-dice version, but dice outcomes come from a fixed scripted sequence.
+  // This supports controlled experiments (shared randomness / replayability).
+  // **IN PLAIN ENGLISH:** Play one game using pre-specified dice so runs are
+  // reproducible and easier to compare across methods.
   // LINE NOTE: backgammonr::SimulatedGameSummary out;
   backgammonr::SimulatedGameSummary out;
   // LINE NOTE: out.game_id = game_id;
@@ -328,8 +433,9 @@ backgammonr::SimulatedGameSummary simulate_one_game_with_rolls(
   for (int turn_index = 0; turn_index < max_turns; ++turn_index) {
     // LINE NOTE: // Script exhausted before turn cap.
     // Script exhausted before turn cap.
-    // LINE NOTE: if (turn_index >= static_cast<int>(rolls.size())) {
-    if (turn_index >= static_cast<int>(rolls.size())) {
+  // LINE NOTE: if (turn_index >= static_cast<int>(rolls.size())) {
+  if (turn_index >= static_cast<int>(rolls.size())) {
+      // Script ended before the simulation reached terminal state or turn cap.
       // LINE NOTE: out.roll_sequence_exhausted = true;
       out.roll_sequence_exhausted = true;
       // LINE NOTE: break;
@@ -343,6 +449,8 @@ backgammonr::SimulatedGameSummary simulate_one_game_with_rolls(
         selection_for_player_unchecked(current.turn, player1_selection, player2_selection);
     // LINE NOTE: if (turn_selection == "random") {
     if (turn_selection == "random") {
+      // Random selection still needs RNG for tie-breaking / random move choice,
+      // even though dice are scripted.
       // LINE NOTE: if (rng == nullptr) {
       if (rng == nullptr) {
         // LINE NOTE: throw std::range_error("Random selection with scripted rolls requires an RNG.");
@@ -398,11 +506,17 @@ backgammonr::SimulatedGameSummary simulate_one_game_with_rolls(
   // LINE NOTE: return out;
   return out;
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Convert per-game simulation records into rectangular R table.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Convert per-game simulation records into rectangular R table.
 // LINE NOTE: Rcpp::DataFrame games_to_data_frame(const backgammonr::MatchupSimulationResult& result) {
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::DataFrame games_to_data_frame(const backgammonr::MatchupSimulationResult& result) {
   // LINE NOTE: const int n = static_cast<int>(result.games.size());
   const int n = static_cast<int>(result.games.size());
@@ -461,12 +575,22 @@ Rcpp::DataFrame games_to_data_frame(const backgammonr::MatchupSimulationResult& 
       // LINE NOTE: Rcpp::_["stringsAsFactors"] = false);
       Rcpp::_["stringsAsFactors"] = false);
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Aggregate matchup-level summary statistics.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Aggregate matchup-level summary statistics.
 // LINE NOTE: Rcpp::DataFrame summary_to_data_frame(const backgammonr::MatchupSimulationResult& result) {
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::DataFrame summary_to_data_frame(const backgammonr::MatchupSimulationResult& result) {
+  // **WHAT IT'S DOING (DETAILED):** Reduces per-game records into one-row
+  // benchmark summary statistics: completion counts, win rates, and turn-length
+  // distribution summaries.
+  // **IN PLAIN ENGLISH:** Turn many game rows into one scoreboard row.
   // LINE NOTE: int completed_games = 0;
   int completed_games = 0;
   // LINE NOTE: int unresolved_games = 0;
@@ -488,6 +612,7 @@ Rcpp::DataFrame summary_to_data_frame(const backgammonr::MatchupSimulationResult
 
   // LINE NOTE: if (!result.games.empty()) {
   if (!result.games.empty()) {
+    // Initialize min/max from first game, then update during scan.
     // LINE NOTE: min_turns = result.games.front().n_turns;
     min_turns = result.games.front().n_turns;
     // LINE NOTE: max_turns = result.games.front().n_turns;
@@ -497,6 +622,7 @@ Rcpp::DataFrame summary_to_data_frame(const backgammonr::MatchupSimulationResult
 
     // LINE NOTE: for (const backgammonr::SimulatedGameSummary& game : result.games) {
     for (const backgammonr::SimulatedGameSummary& game : result.games) {
+      // Single-pass accumulation keeps summary creation O(n_games).
       // LINE NOTE: turn_sum += static_cast<long long>(game.n_turns);
       turn_sum += static_cast<long long>(game.n_turns);
       // LINE NOTE: min_turns = std::min(min_turns, game.n_turns);
@@ -599,17 +725,27 @@ Rcpp::DataFrame summary_to_data_frame(const backgammonr::MatchupSimulationResult
       // LINE NOTE: Rcpp::_["stringsAsFactors"] = false);
       Rcpp::_["stringsAsFactors"] = false);
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: }  // namespace
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 }  // namespace
 
 // LINE NOTE: namespace backgammonr {
+// **WHAT IT'S DOING:** Opens a namespace scope so related symbols stay organized and do not collide with similarly named code elsewhere.
+// **IN PLAIN ENGLISH:** This creates a labeled section so names are easier to manage and safer to reuse.
 namespace backgammonr {
 
 // LINE NOTE: // Public C++ API: simulate many games with random dice.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Public C++ API: simulate many games with random dice.
 // LINE NOTE: MatchupSimulationResult simulate_matchup_random(
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 MatchupSimulationResult simulate_matchup_random(
     // LINE NOTE: const BoardState& initial_board,
     const BoardState& initial_board,
@@ -625,6 +761,10 @@ MatchupSimulationResult simulate_matchup_random(
     const std::string& player2_selection,
     // LINE NOTE: const RolloutConfig& rollout_config) {
     const RolloutConfig& rollout_config) {
+  // **WHAT IT'S DOING (DETAILED):** Batch driver for random-dice experiments.
+  // Validates configuration once, then replays `n_games` independent trajectories
+  // from the same initial board and stores all game-level outcomes.
+  // **IN PLAIN ENGLISH:** Run lots of random games and collect them in one result.
   // LINE NOTE: // Validate selector labels and simulation controls before running any game.
   // Validate selector labels and simulation controls before running any game.
   // LINE NOTE: validate_selection(player1_selection);
@@ -663,6 +803,7 @@ MatchupSimulationResult simulate_matchup_random(
 
   // LINE NOTE: for (int game_id = 1; game_id <= n_games; ++game_id) {
   for (int game_id = 1; game_id <= n_games; ++game_id) {
+    // Each call consumes fresh RNG state so outcomes are independent draws.
     // LINE NOTE: // Each game starts from the same initial board and independent dice stream.
     // Each game starts from the same initial board and independent dice stream.
     // LINE NOTE: result.games.push_back(simulate_one_game_random(
@@ -687,11 +828,17 @@ MatchupSimulationResult simulate_matchup_random(
   // LINE NOTE: return result;
   return result;
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Public C++ API: simulate many games using scripted dice sequence.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Public C++ API: simulate many games using scripted dice sequence.
 // LINE NOTE: MatchupSimulationResult simulate_matchup_with_rolls(
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 MatchupSimulationResult simulate_matchup_with_rolls(
     // LINE NOTE: const BoardState& initial_board,
     const BoardState& initial_board,
@@ -709,6 +856,10 @@ MatchupSimulationResult simulate_matchup_with_rolls(
     std::mt19937* rng,
     // LINE NOTE: const RolloutConfig& rollout_config) {
     const RolloutConfig& rollout_config) {
+  // **WHAT IT'S DOING (DETAILED):** Batch driver for scripted-dice experiments.
+  // Every game sees the same scripted roll prefix, isolating policy effects from
+  // dice-sequence variability.
+  // **IN PLAIN ENGLISH:** Compare methods under a controlled dice script.
   // LINE NOTE: // Same validation contract as random-dice entry point.
   // Same validation contract as random-dice entry point.
   // LINE NOTE: validate_selection(player1_selection);
@@ -773,11 +924,17 @@ MatchupSimulationResult simulate_matchup_with_rolls(
   // LINE NOTE: return result;
   return result;
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // Convert internal result object to R list object used by R wrappers.
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Convert internal result object to R list object used by R wrappers.
 // LINE NOTE: Rcpp::List matchup_simulation_result_to_list(const MatchupSimulationResult& result) {
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List matchup_simulation_result_to_list(const MatchupSimulationResult& result) {
   // LINE NOTE: // Keep both granular (games) and aggregate (summary/settings) views.
   // Keep both granular (games) and aggregate (summary/settings) views.
@@ -808,14 +965,22 @@ Rcpp::List matchup_simulation_result_to_list(const MatchupSimulationResult& resu
           // LINE NOTE: Rcpp::_["max_rollout_turns"] = Rcpp::IntegerVector::create(result.max_rollout_turns)));
           Rcpp::_["max_rollout_turns"] = Rcpp::IntegerVector::create(result.max_rollout_turns)));
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: }  // namespace backgammonr
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 }  // namespace backgammonr
 
 // LINE NOTE: // [[Rcpp::export]]
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
 // LINE NOTE: Rcpp::List bg_cpp_simulate_matchup_random(
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_simulate_matchup_random(
     // LINE NOTE: const Rcpp::List& board,
     const Rcpp::List& board,
@@ -831,6 +996,9 @@ Rcpp::List bg_cpp_simulate_matchup_random(
     const int seed,
     // LINE NOTE: const bool use_seed) {
     const bool use_seed) {
+  // **WHAT IT'S DOING (DETAILED):** Exported Rcpp entry point for random-dice
+  // simulations without explicit rollout-policy parameters.
+  // **IN PLAIN ENGLISH:** R calls this when you want quick random-matchup sims.
   // LINE NOTE: // Parse board and initialize RNG once for the full simulation batch.
   // Parse board and initialize RNG once for the full simulation batch.
   // LINE NOTE: const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
@@ -859,11 +1027,17 @@ Rcpp::List bg_cpp_simulate_matchup_random(
           // LINE NOTE: backgammonr::RolloutConfig()));
           backgammonr::RolloutConfig()));
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // [[Rcpp::export]]
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
 // LINE NOTE: Rcpp::List bg_cpp_simulate_matchup_scripted(
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_simulate_matchup_scripted(
     // LINE NOTE: const Rcpp::List& board,
     const Rcpp::List& board,
@@ -881,6 +1055,11 @@ Rcpp::List bg_cpp_simulate_matchup_scripted(
     const int seed,
     // LINE NOTE: const bool use_seed) {
     const bool use_seed) {
+  // **WHAT IT'S DOING (DETAILED):** Exported Rcpp entry point for scripted-dice
+  // simulations. RNG is created only if any selected policy actually uses
+  // randomness, avoiding unnecessary setup.
+  // **IN PLAIN ENGLISH:** Run scripted-roll simulations efficiently; skip RNG
+  // overhead when deterministic policies are used.
   // LINE NOTE: // Parse board + scripted rolls up front.
   // Parse board + scripted rolls up front.
   // LINE NOTE: const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
@@ -924,11 +1103,17 @@ Rcpp::List bg_cpp_simulate_matchup_scripted(
           // LINE NOTE: backgammonr::RolloutConfig()));
           backgammonr::RolloutConfig()));
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // [[Rcpp::export]]
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
 // LINE NOTE: Rcpp::List bg_cpp_simulate_matchup_random_rollout(
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_simulate_matchup_random_rollout(
     // LINE NOTE: const Rcpp::List& board,
     const Rcpp::List& board,
@@ -950,6 +1135,9 @@ Rcpp::List bg_cpp_simulate_matchup_random_rollout(
     const int seed,
     // LINE NOTE: const bool use_seed) {
     const bool use_seed) {
+  // **WHAT IT'S DOING (DETAILED):** Same as `bg_cpp_simulate_matchup_random`,
+  // but explicitly threads rollout-policy parameters into the simulation config.
+  // **IN PLAIN ENGLISH:** Random-dice batch simulation where rollout behavior is configurable.
   // LINE NOTE: // Random-dice rollout matchup wrapper (rollout policies enabled).
   // Random-dice rollout matchup wrapper (rollout policies enabled).
   // LINE NOTE: const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
@@ -980,11 +1168,17 @@ Rcpp::List bg_cpp_simulate_matchup_random_rollout(
           // LINE NOTE: rollout_config));
           rollout_config));
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
 // LINE NOTE: // [[Rcpp::export]]
+// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
+// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
 // LINE NOTE: Rcpp::List bg_cpp_simulate_matchup_scripted_rollout(
+// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
+// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_simulate_matchup_scripted_rollout(
     // LINE NOTE: const Rcpp::List& board,
     const Rcpp::List& board,
@@ -1008,6 +1202,10 @@ Rcpp::List bg_cpp_simulate_matchup_scripted_rollout(
     const int seed,
     // LINE NOTE: const bool use_seed) {
     const bool use_seed) {
+  // **WHAT IT'S DOING (DETAILED):** Scripted-dice + rollout-config export path.
+  // Useful for reproducible method comparisons where both dice sequence and
+  // rollout policy parameters are controlled.
+  // **IN PLAIN ENGLISH:** Controlled benchmark mode: fixed dice and configurable rollout policy.
   // LINE NOTE: // Scripted-dice rollout matchup wrapper (rollout policies enabled).
   // Scripted-dice rollout matchup wrapper (rollout policies enabled).
   // LINE NOTE: const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
@@ -1042,4 +1240,6 @@ Rcpp::List bg_cpp_simulate_matchup_scripted_rollout(
           // LINE NOTE: rollout_config));
           rollout_config));
 // LINE NOTE: }
+// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
+// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
