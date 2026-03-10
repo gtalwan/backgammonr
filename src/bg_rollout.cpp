@@ -1,11 +1,10 @@
 #include "bg_rollout.h"
 
-#include <cstdint>
-#include <random>
 #include <stdexcept>
 #include <vector>
 
 #include "bg_allocation.h"
+#include "bg_rng.h"
 
 // -----------------------------------------------------------------------------
 // bg_rollout.cpp
@@ -19,31 +18,6 @@
 // - This keeps one allocation engine (in bg_allocation.cpp) as the single
 //   source of truth, while offering a stable rollout-facing interface.
 // -----------------------------------------------------------------------------
-
-namespace {
-
-// Function: init_rng
-// Purpose: Build the RNG stream used by this translation unit.
-// Called by: bg_cpp_rollout_move_evaluate(), bg_cpp_rollout_move_choice().
-// Notes: Uses deterministic seeding when `use_seed = true`; otherwise uses
-// system entropy so repeated calls are not forced to match.
-std::mt19937 init_rng(const int seed, const bool use_seed) {
-  std::mt19937 rng;
-
-  if (use_seed) {
-    if (seed < 0) {
-      throw std::range_error("`seed` must be nonnegative when supplied.");
-    }
-    rng.seed(static_cast<std::uint32_t>(seed));
-  } else {
-    std::random_device rd;
-    rng.seed(rd());
-  }
-
-  return rng;
-}
-
-}  // namespace
 
 namespace backgammonr {
 
@@ -258,7 +232,7 @@ Rcpp::DataFrame bg_cpp_rollout_move_evaluate(
       backgammonr::parse_move_sequence_vector(legal_moves);
   const backgammonr::RolloutConfig config{rollout_budget, rollout_policy, max_rollout_turns};
   // Build per-call RNG.
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
 
   // Return standardized action table so all methods share downstream tooling.
   return backgammonr::action_evaluation_summaries_to_data_frame(
@@ -289,7 +263,7 @@ Rcpp::List bg_cpp_rollout_move_choice(
       backgammonr::parse_move_sequence_vector(legal_moves);
   const backgammonr::RolloutConfig config{rollout_budget, rollout_policy, max_rollout_turns};
   // Build per-call RNG.
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
 
   // Choose one move under equal-allocation rollout logic and convert to R list.
   return backgammonr::move_sequence_to_list(

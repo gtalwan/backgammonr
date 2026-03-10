@@ -28,10 +28,6 @@ bg_recommended_row <- function(evaluation) {
   evaluation$results[idx, , drop = FALSE]
 }
 
-bg_truth_lookup <- function(truth_table, column = "estimate") {
-  stats::setNames(truth_table[[column]], truth_table$candidate_index)
-}
-
 #' Compare allocation methods on one fixed decision problem
 #'
 #' Runs several rollout-allocation methods on the same board + roll with the
@@ -121,7 +117,6 @@ compare_methods_on_position <- function(
     method <- methods[[i]]
     method_seed <- bg_derive_seed(seed, "compare_methods_on_position", method, total_budget)
 
-    start <- as.numeric(proc.time()[3L])
     ev <- bg_evaluate_actions_method(
       board = board,
       method = method,
@@ -140,7 +135,7 @@ compare_methods_on_position <- function(
       fast_diagnostics = fast_diagnostics,
       seed = method_seed
     )
-    runtime <- as.numeric(proc.time()[3L] - start)
+    runtime <- bg_action_runtime_seconds(ev)
     evaluations[[i]] <- ev
 
     if (nrow(ev$results) == 0L) {
@@ -162,8 +157,7 @@ compare_methods_on_position <- function(
     }
 
     best_row <- bg_recommended_row(ev)
-    sorted_est <- sort(ev$results$estimate, decreasing = TRUE)
-    estimate_gap_top2 <- if (length(sorted_est) > 1L) sorted_est[[1L]] - sorted_est[[2L]] else NA_real_
+    estimate_gap_top2 <- bg_top_two_gap(ev$results$estimate)
 
     rows[[i]] <- data.frame(
       method = method,
@@ -282,6 +276,7 @@ study_budget_tradeoff <- function(
     truth_dice_mode = c("iid", "stratified_first_roll", "stratified_first_two_rolls"),
     truth_crn = FALSE,
     seed = NULL) {
+  method <- match.arg(method)
   if (!is_bg_board(board)) {
     stop("`board` must inherit from class 'bg_board'.", call. = FALSE)
   }
@@ -314,12 +309,8 @@ study_budget_tradeoff <- function(
     seed = bg_derive_seed(seed, "study_budget_tradeoff", "truth")
   )
 
-  truth_table <- truth$results[order(truth$results$candidate_index), , drop = FALSE]
-  truth_values <- truth_table$estimate
-  truth_lookup <- bg_truth_lookup(truth_table, "estimate")
-  truth_label_lookup <- stats::setNames(as.character(truth_table$move_label), truth_table$candidate_index)
+  truth_info <- bg_reference_snapshot(truth)
   truth_best_index <- truth$recommended_index
-  truth_best_value <- max(truth_values)
 
   rows <- vector("list", length(budgets))
   evaluations <- vector("list", length(budgets))
@@ -329,7 +320,6 @@ study_budget_tradeoff <- function(
     budget <- budgets[[i]]
     run_seed <- bg_derive_seed(seed, "study_budget_tradeoff", method, budget)
 
-    start <- as.numeric(proc.time()[3L])
     ev <- bg_evaluate_actions_method(
       board = board,
       method = method,
@@ -348,10 +338,15 @@ study_budget_tradeoff <- function(
       fast_diagnostics = fast_diagnostics,
       seed = run_seed
     )
-    runtime <- as.numeric(proc.time()[3L] - start)
+    runtime <- bg_action_runtime_seconds(ev)
     evaluations[[i]] <- ev
+    metrics <- bg_action_reference_metrics(
+      evaluation = ev,
+      reference_snapshot = truth_info,
+      reference_best_index = truth_best_index
+    )
 
-    if (nrow(ev$results) == 0L) {
+    if (metrics$n_legal_moves == 0L) {
       rows[[i]] <- data.frame(
         method = method,
         total_budget = budget,
@@ -372,32 +367,20 @@ study_budget_tradeoff <- function(
       next
     }
 
-    ev_table <- ev$results[order(ev$results$candidate_index), , drop = FALSE]
-    if (!identical(ev_table$candidate_index, truth_table$candidate_index)) {
-      stop("Internal error: candidate sets differ between truth and budget runs.", call. = FALSE)
-    }
-
-    best_row <- bg_recommended_row(ev)
-    chosen_index <- ev$recommended_index
-    chosen_truth_value <- truth_lookup[[as.character(chosen_index)]]
-    if (is.null(chosen_truth_value)) {
-      stop("Internal error: selected candidate was not found in truth lookup.", call. = FALSE)
-    }
-
     rows[[i]] <- data.frame(
       method = method,
       total_budget = budget,
-      n_legal_moves = nrow(ev$results),
-      chosen_index = chosen_index,
-      chosen_move_label = best_row$move_label[[1L]],
+      n_legal_moves = metrics$n_legal_moves,
+      chosen_index = metrics$chosen_index,
+      chosen_move_label = metrics$chosen_move_label,
       truth_best_index = truth_best_index,
-      truth_best_move_label = truth_label_lookup[[as.character(truth_best_index)]],
-      chosen_estimate = best_row$estimate[[1L]],
-      chosen_truth_value = chosen_truth_value,
-      truth_best_value = truth_best_value,
-      correct_selection = chosen_index == truth_best_index,
-      simple_regret = compute_simple_regret(chosen_truth_value, truth_best_value),
-      mse = compute_mse(ev_table$estimate, truth_values),
+      truth_best_move_label = truth_info$label_lookup[[as.character(truth_best_index)]],
+      chosen_estimate = metrics$chosen_estimate,
+      chosen_truth_value = metrics$chosen_reference_value,
+      truth_best_value = truth_info$best_value,
+      correct_selection = metrics$correct_selection,
+      simple_regret = metrics$simple_regret,
+      mse = metrics$mse,
       runtime_seconds = runtime,
       stringsAsFactors = FALSE
     )
@@ -513,6 +496,7 @@ study_variance_controls <- function(
     truth_dice_mode = c("iid", "stratified_first_roll", "stratified_first_two_rolls"),
     truth_crn = FALSE,
     seed = NULL) {
+  method <- match.arg(method)
   if (!is_bg_board(board)) {
     stop("`board` must inherit from class 'bg_board'.", call. = FALSE)
   }
@@ -565,12 +549,8 @@ study_variance_controls <- function(
     seed = bg_derive_seed(seed, "study_variance_controls", "truth")
   )
 
-  truth_table <- truth$results[order(truth$results$candidate_index), , drop = FALSE]
-  truth_values <- truth_table$estimate
-  truth_lookup <- bg_truth_lookup(truth_table, "estimate")
-  truth_label_lookup <- stats::setNames(as.character(truth_table$move_label), truth_table$candidate_index)
+  truth_info <- bg_reference_snapshot(truth)
   truth_best_index <- truth$recommended_index
-  truth_best_value <- max(truth_values)
 
   rows <- list()
   evaluations <- list()
@@ -581,7 +561,6 @@ study_variance_controls <- function(
       run_seed <- bg_derive_seed(seed, "study_variance_controls", method, total_budget, dice_mode, crn)
       key <- paste0(dice_mode, "_crn_", if (crn) "true" else "false")
 
-      start <- as.numeric(proc.time()[3L])
       ev <- bg_evaluate_actions_method(
         board = board,
         method = method,
@@ -600,10 +579,15 @@ study_variance_controls <- function(
         fast_diagnostics = fast_diagnostics,
         seed = run_seed
       )
-      runtime <- as.numeric(proc.time()[3L] - start)
+      runtime <- bg_action_runtime_seconds(ev)
       evaluations[[key]] <- ev
+      metrics <- bg_action_reference_metrics(
+        evaluation = ev,
+        reference_snapshot = truth_info,
+        reference_best_index = truth_best_index
+      )
 
-      if (nrow(ev$results) == 0L) {
+      if (metrics$n_legal_moves == 0L) {
         rows[[row_id]] <- data.frame(
           method = method,
           total_budget = total_budget,
@@ -627,34 +611,22 @@ study_variance_controls <- function(
         next
       }
 
-      ev_table <- ev$results[order(ev$results$candidate_index), , drop = FALSE]
-      if (!identical(ev_table$candidate_index, truth_table$candidate_index)) {
-        stop("Internal error: candidate sets differ between truth and variance-control runs.", call. = FALSE)
-      }
-
-      best_row <- bg_recommended_row(ev)
-      chosen_index <- ev$recommended_index
-      chosen_truth_value <- truth_lookup[[as.character(chosen_index)]]
-      if (is.null(chosen_truth_value)) {
-        stop("Internal error: selected candidate was not found in truth lookup.", call. = FALSE)
-      }
-
       rows[[row_id]] <- data.frame(
         method = method,
         total_budget = total_budget,
         dice_mode = dice_mode,
         crn = crn,
-        n_legal_moves = nrow(ev$results),
-        chosen_index = chosen_index,
-        chosen_move_label = best_row$move_label[[1L]],
+        n_legal_moves = metrics$n_legal_moves,
+        chosen_index = metrics$chosen_index,
+        chosen_move_label = metrics$chosen_move_label,
         truth_best_index = truth_best_index,
-        truth_best_move_label = truth_label_lookup[[as.character(truth_best_index)]],
-        chosen_estimate = best_row$estimate[[1L]],
-        chosen_truth_value = chosen_truth_value,
-        truth_best_value = truth_best_value,
-        correct_selection = chosen_index == truth_best_index,
-        simple_regret = compute_simple_regret(chosen_truth_value, truth_best_value),
-        mse = compute_mse(ev_table$estimate, truth_values),
+        truth_best_move_label = truth_info$label_lookup[[as.character(truth_best_index)]],
+        chosen_estimate = metrics$chosen_estimate,
+        chosen_truth_value = metrics$chosen_reference_value,
+        truth_best_value = truth_info$best_value,
+        correct_selection = metrics$correct_selection,
+        simple_regret = metrics$simple_regret,
+        mse = metrics$mse,
         runtime_seconds = runtime,
         stringsAsFactors = FALSE
       )

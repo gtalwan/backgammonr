@@ -2,10 +2,31 @@ bg_match_thompson_method <- function(method) {
   match.arg(method, choices = c("thompson", "ttts"))
 }
 
-bg_extract_reference_best_cols <- function(tab) {
-  best_idx_col <- if ("reference_best_index" %in% names(tab)) "reference_best_index" else "truth_best_index"
-  best_label_col <- if ("reference_best_move_label" %in% names(tab)) "reference_best_move_label" else "truth_best_move_label"
-  list(index = best_idx_col, label = best_label_col)
+bg_evaluate_thompson_family <- function(
+    method,
+    board,
+    roll,
+    total_budget,
+    ttts_beta = 0.5,
+    ...) {
+  if (method == "thompson") {
+    return(
+      evaluate_actions_thompson(
+        board = board,
+        roll = roll,
+        total_budget = total_budget,
+        ...
+      )
+    )
+  }
+
+  evaluate_actions_ttts(
+    board = board,
+    roll = roll,
+    total_budget = total_budget,
+    ttts_beta = ttts_beta,
+    ...
+  )
 }
 
 #' Trace Thompson-sampling allocation dynamics
@@ -58,54 +79,35 @@ trace_thompson_allocation <- function(
     crn = FALSE,
     fast_diagnostics = TRUE,
     trace_every = 1L,
-    seed = NULL) {
+  seed = NULL) {
   method <- bg_match_thompson_method(method)
 
-  ev <- if (method == "thompson") {
-    evaluate_actions_thompson(
-      board = board,
-      roll = roll,
-      total_budget = total_budget,
-      rollout_policy = rollout_policy,
-      max_rollout_turns = max_rollout_turns,
-      unresolved_value = unresolved_value,
-      initial_allocations = initial_allocations,
-      prior_alpha = prior_alpha,
-      prior_beta = prior_beta,
-      dice_mode = dice_mode,
-      crn = crn,
-      fast_diagnostics = fast_diagnostics,
-      trace = TRUE,
-      trace_every = trace_every,
-      seed = seed
-    )
-  } else {
-    evaluate_actions_ttts(
-      board = board,
-      roll = roll,
-      total_budget = total_budget,
-      rollout_policy = rollout_policy,
-      max_rollout_turns = max_rollout_turns,
-      unresolved_value = unresolved_value,
-      initial_allocations = initial_allocations,
-      ttts_beta = ttts_beta,
-      prior_alpha = prior_alpha,
-      prior_beta = prior_beta,
-      dice_mode = dice_mode,
-      crn = crn,
-      fast_diagnostics = fast_diagnostics,
-      trace = TRUE,
-      trace_every = trace_every,
-      seed = seed
-    )
-  }
+  ev <- bg_evaluate_thompson_family(
+    method = method,
+    board = board,
+    roll = roll,
+    total_budget = total_budget,
+    ttts_beta = ttts_beta,
+    rollout_policy = rollout_policy,
+    max_rollout_turns = max_rollout_turns,
+    unresolved_value = unresolved_value,
+    initial_allocations = initial_allocations,
+    prior_alpha = prior_alpha,
+    prior_beta = prior_beta,
+    dice_mode = dice_mode,
+    crn = crn,
+    fast_diagnostics = fast_diagnostics,
+    trace = TRUE,
+    trace_every = trace_every,
+    seed = seed
+  )
 
   tr <- ev$trace
   if (is.null(tr) || nrow(tr) == 0L) {
     stop("Trace output is empty. Re-run with `trace = TRUE` and valid budget.", call. = FALSE)
   }
 
-  move_label_lookup <- stats::setNames(as.character(ev$results$move_label), ev$results$candidate_index)
+  move_label_lookup <- bg_candidate_label_lookup(ev$results)
   tr$candidate_move_label <- unname(move_label_lookup[as.character(tr$candidate_index)])
   tr$leader_move_label <- unname(move_label_lookup[as.character(tr$leader_index)])
 
@@ -254,42 +256,24 @@ compare_thompson_to_reference <- function(
 
   legal_moves <- bg_legal_moves(board, roll)
 
-  finite <- if (method == "thompson") {
-    evaluate_actions_thompson(
-      board = board,
-      roll = roll,
-      legal_moves = legal_moves,
-      total_budget = total_budget,
-      rollout_policy = rollout_policy,
-      max_rollout_turns = max_rollout_turns,
-      unresolved_value = unresolved_value,
-      initial_allocations = initial_allocations,
-      prior_alpha = prior_alpha,
-      prior_beta = prior_beta,
-      dice_mode = dice_mode,
-      crn = crn,
-      fast_diagnostics = fast_diagnostics,
-      seed = bg_derive_seed(seed, "compare_thompson_to_reference", "finite", method, total_budget)
-    )
-  } else {
-    evaluate_actions_ttts(
-      board = board,
-      roll = roll,
-      legal_moves = legal_moves,
-      total_budget = total_budget,
-      rollout_policy = rollout_policy,
-      max_rollout_turns = max_rollout_turns,
-      unresolved_value = unresolved_value,
-      initial_allocations = initial_allocations,
-      ttts_beta = ttts_beta,
-      prior_alpha = prior_alpha,
-      prior_beta = prior_beta,
-      dice_mode = dice_mode,
-      crn = crn,
-      fast_diagnostics = fast_diagnostics,
-      seed = bg_derive_seed(seed, "compare_thompson_to_reference", "finite", method, total_budget)
-    )
-  }
+  finite <- bg_evaluate_thompson_family(
+    method = method,
+    board = board,
+    roll = roll,
+    total_budget = total_budget,
+    ttts_beta = ttts_beta,
+    legal_moves = legal_moves,
+    rollout_policy = rollout_policy,
+    max_rollout_turns = max_rollout_turns,
+    unresolved_value = unresolved_value,
+    initial_allocations = initial_allocations,
+    prior_alpha = prior_alpha,
+    prior_beta = prior_beta,
+    dice_mode = dice_mode,
+    crn = crn,
+    fast_diagnostics = fast_diagnostics,
+    seed = bg_derive_seed(seed, "compare_thompson_to_reference", "finite", method, total_budget)
+  )
 
   if (is.null(reference)) {
     reference <- approximate_action_truth(
@@ -310,27 +294,21 @@ compare_thompson_to_reference <- function(
     )
   }
 
-  finite_tab <- finite$results[order(finite$results$candidate_index), , drop = FALSE]
-  reference_tab <- reference$results[order(reference$results$candidate_index), , drop = FALSE]
-
-  if (!identical(finite_tab$candidate_index, reference_tab$candidate_index)) {
-    stop("Internal error: candidate sets differ between finite and reference runs.", call. = FALSE)
-  }
-
-  chosen_index <- finite$recommended_index
+  reference_info <- bg_reference_snapshot(reference)
   reference_best_index <- reference$recommended_index
-  chosen_row <- bg_recommended_row(finite)
-
-  ref_lookup <- stats::setNames(reference_tab$estimate, reference_tab$candidate_index)
-  ref_label_lookup <- stats::setNames(as.character(reference_tab$move_label), reference_tab$candidate_index)
-  chosen_reference_value <- ref_lookup[[as.character(chosen_index)]]
-  reference_best_value <- max(reference_tab$estimate)
+  metrics <- bg_action_reference_metrics(
+    evaluation = finite,
+    reference_snapshot = reference_info,
+    reference_best_index = reference_best_index
+  )
+  finite_tab <- metrics$evaluation_table
+  reference_tab <- reference_info$table
 
   action_error <- finite_tab$estimate - reference_tab$estimate
   action_table <- data.frame(
     candidate_index = finite_tab$candidate_index,
     move_label = finite_tab$move_label,
-    finite_recommended = finite_tab$candidate_index == chosen_index,
+    finite_recommended = finite_tab$candidate_index == metrics$chosen_index,
     reference_best = finite_tab$candidate_index == reference_best_index,
     finite_allocation_count = finite_tab$allocation_count,
     finite_estimate = finite_tab$estimate,
@@ -360,23 +338,19 @@ compare_thompson_to_reference <- function(
     method = method,
     total_budget = total_budget,
     reference_budget = reference_budget,
-    chosen_index = chosen_index,
-    chosen_move_label = chosen_row$move_label[[1L]],
-    chosen_allocation_count = chosen_row$allocation_count[[1L]],
-    chosen_estimate = chosen_row$estimate[[1L]],
-    chosen_prob_best = if ("prob_best" %in% names(chosen_row)) chosen_row$prob_best[[1L]] else NA_real_,
-    chosen_expected_regret = if ("posterior_expected_regret" %in% names(chosen_row)) {
-      chosen_row$posterior_expected_regret[[1L]]
-    } else {
-      NA_real_
-    },
+    chosen_index = metrics$chosen_index,
+    chosen_move_label = metrics$chosen_move_label,
+    chosen_allocation_count = metrics$chosen_allocation_count,
+    chosen_estimate = metrics$chosen_estimate,
+    chosen_prob_best = metrics$chosen_prob_best,
+    chosen_expected_regret = metrics$chosen_expected_regret,
     reference_best_index = reference_best_index,
-    reference_best_move_label = ref_label_lookup[[as.character(reference_best_index)]],
-    proxy_pcs = compute_probability_of_correct_selection(chosen_index, reference_best_index),
-    simple_regret = compute_simple_regret(chosen_reference_value, reference_best_value),
-    mse = compute_mse(finite_tab$estimate, reference_tab$estimate),
-    finite_runtime_seconds = finite$runtime_seconds,
-    reference_runtime_seconds = reference$runtime_seconds,
+    reference_best_move_label = reference_info$label_lookup[[as.character(reference_best_index)]],
+    proxy_pcs = compute_probability_of_correct_selection(metrics$chosen_index, reference_best_index),
+    simple_regret = metrics$simple_regret,
+    mse = metrics$mse,
+    finite_runtime_seconds = bg_action_runtime_seconds(finite),
+    reference_runtime_seconds = bg_action_runtime_seconds(reference),
     reference_gap_estimate = cert_row$top_two_gap_estimate[[1L]],
     reference_gap_lower_95 = cert_row$top_two_gap_lower_95[[1L]],
     reference_gap_upper_95 = cert_row$top_two_gap_upper_95[[1L]],

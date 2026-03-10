@@ -7,10 +7,7 @@
 #include <Rcpp.h>
 
 #include <chrono>
-#include <cstdint>
 #include <functional>
-#include <optional>
-#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -19,30 +16,11 @@
 #include "bg_game.h"
 #include "bg_move.h"
 #include "bg_movegen.h"
+#include "bg_rng.h"
 
 namespace {
 
 using Clock = std::chrono::steady_clock;
-
-// Function: init_rng
-// Purpose: Build RNG stream for benchmark wrappers.
-// Called by: all exported benchmark entry points in this file.
-// Notes: Determinism matters for method-vs-method reproducibility.
-std::mt19937 init_rng(const int seed, const bool use_seed) {
-  std::mt19937 rng;
-
-  if (use_seed) {
-    if (seed < 0) {
-      throw std::range_error("`seed` must be nonnegative when supplied.");
-    }
-    rng.seed(static_cast<std::uint32_t>(seed));
-  } else {
-    std::random_device rd;
-    rng.seed(rd());
-  }
-
-  return rng;
-}
 
 // Function: stable_stream_seed
 // Purpose: Derive deterministic child stream seeds from case/method labels.
@@ -564,7 +542,7 @@ Rcpp::List bg_cpp_benchmark_matchup_random(
     const bool use_seed) {
   // Parse input state and initialize one RNG stream for this benchmark call.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
   const backgammonr::RolloutConfig rollout_config{rollout_budget, rollout_policy, max_rollout_turns};
 
   return backgammonr::matchup_benchmark_result_to_list(
@@ -604,7 +582,7 @@ Rcpp::List bg_cpp_benchmark_matchup_scripted(
   // Only allocate RNG when at least one player policy is stochastic.
   if (backgammonr::selection_uses_randomness(player1_selection) ||
       backgammonr::selection_uses_randomness(player2_selection)) {
-    rng = init_rng(seed, use_seed);
+    rng = backgammonr::init_rng(seed, use_seed);
     rng_ptr = &rng;
   }
 
@@ -643,7 +621,7 @@ Rcpp::List bg_cpp_benchmark_move_evaluators(
       reference_rollout_budget,
       reference_rollout_policy,
       reference_max_rollout_turns};
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
 
   const std::optional<std::string> parsed_reference_method =
       reference_method.empty() ? std::nullopt : std::optional<std::string>(reference_method);

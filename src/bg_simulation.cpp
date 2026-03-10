@@ -3,8 +3,6 @@
 // aggregates per-game stochastic outcomes into study-ready summary tables.
 
 #include <algorithm>
-#include <cstdint>
-#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -12,6 +10,7 @@
 
 #include "bg_game.h"
 #include "bg_movegen.h"
+#include "bg_rng.h"
 #include "bg_rules.h"
 
 namespace {
@@ -40,25 +39,6 @@ void validate_max_turns(const int max_turns) {
   if (max_turns < 0) {
     throw std::range_error("`max_turns` must be nonnegative.");
   }
-}
-
-// Function: init_rng
-// Purpose: Build RNG stream for simulation wrappers.
-// Called by: all exported simulation functions in this file.
-std::mt19937 init_rng(const int seed, const bool use_seed) {
-  std::mt19937 rng;
-
-  if (use_seed) {
-    if (seed < 0) {
-      throw std::range_error("`seed` must be nonnegative when supplied.");
-    }
-    rng.seed(static_cast<std::uint32_t>(seed));
-  } else {
-    std::random_device rd;
-    rng.seed(rd());
-  }
-
-  return rng;
 }
 
 // Function: parse_roll_vector
@@ -493,7 +473,7 @@ Rcpp::List bg_cpp_simulate_matchup_random(
     const bool use_seed) {
   // Parse board and initialize RNG once for the full simulation batch.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
 
   // Non-rollout wrapper uses default rollout config values.
   return backgammonr::matchup_simulation_result_to_list(
@@ -529,7 +509,7 @@ Rcpp::List bg_cpp_simulate_matchup_scripted(
   std::mt19937* rng_ptr = nullptr;
   // If no policy uses randomness we can skip RNG allocation entirely.
   if (selection_uses_randomness(player1_selection) || selection_uses_randomness(player2_selection)) {
-    rng = init_rng(seed, use_seed);
+    rng = backgammonr::init_rng(seed, use_seed);
     rng_ptr = &rng;
   }
 
@@ -563,7 +543,7 @@ Rcpp::List bg_cpp_simulate_matchup_random_rollout(
     const bool use_seed) {
   // Same as random wrapper, but threads rollout-policy parameters explicitly.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
   // Rollout-specific config used when players are rollout family selectors.
   const backgammonr::RolloutConfig rollout_config{rollout_budget, rollout_policy, max_rollout_turns};
 
@@ -598,7 +578,7 @@ Rcpp::List bg_cpp_simulate_matchup_scripted_rollout(
   // Scripted-dice wrapper with rollout controls for reproducible comparisons.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::DiceRoll> parsed_rolls = parse_roll_vector(rolls);
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
   // Same rollout config but with scripted rolls.
   const backgammonr::RolloutConfig rollout_config{rollout_budget, rollout_policy, max_rollout_turns};
 

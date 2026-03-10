@@ -31,6 +31,7 @@
 
 #include "bg_game.h"
 #include "bg_movegen.h"
+#include "bg_rng.h"
 #include "bg_rules.h"
 
 namespace {
@@ -125,26 +126,6 @@ void play_random_turn_lightweight(
   // Purpose: Fast random-turn execution path used inside rollout loops.
   // Called by: single_rollout_outcome() random-policy branch.
   (void) backgammonr::play_random_turn_rollout_fast(board, roll, rng);
-}
-
-std::mt19937 init_rng(const int seed, const bool use_seed) {
-  // Function: init_rng
-  // Purpose: Build per-call RNG stream for allocation exports.
-  // Called by: bg_cpp_allocation_evaluate(), bg_cpp_allocation_evaluate_trace(),
-  // bg_cpp_profile_rollout_runtime().
-  std::mt19937 rng;
-
-  if (use_seed) {
-    if (seed < 0) {
-      throw std::range_error("`seed` must be nonnegative when supplied.");
-    }
-    rng.seed(static_cast<std::uint32_t>(seed));
-  } else {
-    std::random_device rd;
-    rng.seed(rd());
-  }
-
-  return rng;
 }
 
 double outcome_reward(const RolloutOutcome outcome, const backgammonr::RolloutConfig& config) {
@@ -550,7 +531,6 @@ void compute_posterior_diagnostics(
     // The vector subtraction is element-wise:
     // `best_value - draw[i]` is the regret of candidate i in this posterior world.
     // Averaging this across draws gives a Bayes-style simple regret diagnostic.
-    // Bayes simple regret for each candidate under this posterior draw.
     regret_sum += (best_value - draw);
   }
 
@@ -561,88 +541,17 @@ void compute_posterior_diagnostics(
   }
 }
 
-void finalize_summaries(
-    std::vector<backgammonr::ActionEvaluationSummary>& summaries,
-    const AllocationPolicy policy,
-    const backgammonr::RolloutConfig& config,
-    std::mt19937& rng) {
-  // Function: finalize_summaries
-  // Purpose: Finalize estimates, uncertainty intervals, and diagnostic fields.
-  // Called by: evaluate_with_optional_trace() at end of budget loop.
-  // Convert integer counts and Beta parameters into vectorized Armadillo arrays.
-  const int n = static_cast<int>(summaries.size());
-  arma::vec counts(n);
-  arma::vec wins(n);
-  arma::vec unresolved(n);
-  arma::vec alpha(n);
-  arma::vec beta(n);
-
-  for (int i = 0; i < n; ++i) {
-    counts[i] = static_cast<double>(summaries[i].allocation_count);
-    wins[i] = static_cast<double>(summaries[i].wins);
-    unresolved[i] = static_cast<double>(summaries[i].unresolved);
-    alpha[i] = summaries[i].alpha;
-    beta[i] = summaries[i].beta;
-  }
-
-  const arma::vec posterior_mean = alpha / (alpha + beta);
-  const arma::vec posterior_var =
-      (alpha % beta) / (arma::square(alpha + beta) % (alpha + beta + 1.0));
-  const arma::vec posterior_sd = arma::sqrt(arma::clamp(posterior_var, 0.0, 1.0));
-  const arma::vec lower_95 = arma::clamp(posterior_mean - 1.96 * posterior_sd, 0.0, 1.0);
-  const arma::vec upper_95 = arma::clamp(posterior_mean + 1.96 * posterior_sd, 0.0, 1.0);
-
-  for (int i = 0; i < n; ++i) {
-    // Empirical value uses unresolved_value for unresolved outcomes.
-    if (summaries[i].allocation_count > 0) {
-      summaries[i].empirical_value =
-          (wins[i] + config.unresolved_value * unresolved[i]) /
-          counts[i];
-    } else {
-      summaries[i].empirical_value = NA_REAL;
-    }
-
-    summaries[i].estimate = posterior_mean[i];
-    summaries[i].posterior_sd = posterior_sd[i];
-    summaries[i].lower_95 = lower_95[i];
-    summaries[i].upper_95 = upper_95[i];
-    summaries[i].selection_score = posterior_mean[i];
-  }
-
-  if (policy == AllocationPolicy::kUcb) {
-    // Selection score for UCB includes exploration bonus.
-    const double total_allocations = arma::accu(counts);
-    const arma::vec denom = arma::max(counts, arma::ones<arma::vec>(n));
-    const arma::vec bonus = config.ucb_exploration *
-        arma::sqrt(std::log(total_allocations + 1.0) / denom);
-
-    for (int i = 0; i < n; ++i) {
-      summaries[i].selection_score = posterior_mean[i] + bonus[i];
-    }
-  }
-
-  if (!config.fast_diagnostics) {
-    // Full output mode: compute posterior diagnostics.
-    compute_posterior_diagnostics(summaries, rng);
-    return;
-  }
-
-  for (int i = 0; i < n; ++i) {
-    // Fast mode: skip expensive diagnostics.
-    summaries[i].prob_best = NA_REAL;
-    summaries[i].posterior_expected_regret = NA_REAL;
-  }
-}
-
-void update_interim_summary_fields(
+void refresh_summary_fields(
     std::vector<backgammonr::ActionEvaluationSummary>& summaries,
     const AllocationPolicy policy,
     const backgammonr::RolloutConfig& config,
     const int total_allocations) {
-  // Function: update_interim_summary_fields
-  // Purpose: Cheap partial summary update used for trace checkpoints.
-  // Called by: append_trace_snapshot().
-  // Cheaper variant used for trace snapshots during allocation loop.
+  // Function: refresh_summary_fields
+  // Purpose: Update estimate, uncertainty, and selection-score fields in place.
+  // Called by: finalize_summaries(), append_trace_snapshot().
+  // Notes: We keep the vectorized Armadillo implementation so summary refreshes
+  // remain fast while `finalize_summaries()` and trace checkpoints share one
+  // code path.
   const int n = static_cast<int>(summaries.size());
   if (n == 0) {
     return;
@@ -697,6 +606,33 @@ void update_interim_summary_fields(
   }
 }
 
+void finalize_summaries(
+    std::vector<backgammonr::ActionEvaluationSummary>& summaries,
+    const AllocationPolicy policy,
+    const backgammonr::RolloutConfig& config,
+    std::mt19937& rng) {
+  // Function: finalize_summaries
+  // Purpose: Finalize estimates, uncertainty intervals, and diagnostic fields.
+  // Called by: evaluate_with_optional_trace() at end of budget loop.
+  int total_allocations = 0;
+  for (const backgammonr::ActionEvaluationSummary& summary : summaries) {
+    total_allocations += summary.allocation_count;
+  }
+  refresh_summary_fields(summaries, policy, config, total_allocations);
+
+  if (!config.fast_diagnostics) {
+    // Full output mode: compute posterior diagnostics.
+    compute_posterior_diagnostics(summaries, rng);
+    return;
+  }
+
+  for (backgammonr::ActionEvaluationSummary& summary : summaries) {
+    // Fast mode: skip expensive diagnostics.
+    summary.prob_best = NA_REAL;
+    summary.posterior_expected_regret = NA_REAL;
+  }
+}
+
 int current_leader_index(const std::vector<backgammonr::ActionEvaluationSummary>& summaries) {
   // Function: current_leader_index
   // Purpose: Identify current leader for trace reporting.
@@ -733,7 +669,7 @@ void append_trace_snapshot(
   // Purpose: Emit one checkpoint block (one row per candidate) into trace table.
   // Called by: evaluate_with_optional_trace() via maybe_trace lambda.
   // Refresh per-candidate fields as of this checkpoint.
-  update_interim_summary_fields(summaries, policy, config, checkpoint);
+  refresh_summary_fields(summaries, policy, config, checkpoint);
   const int leader_pos = current_leader_index(summaries);
   const int leader_index = leader_pos == NA_INTEGER
       ? NA_INTEGER
@@ -1411,7 +1347,7 @@ Rcpp::List bg_cpp_allocation_evaluate(
       use_seed,
       fast_diagnostics};
   // Local RNG stream for this evaluation call.
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
 
   const std::vector<backgammonr::ActionEvaluationSummary> summaries =
       backgammonr::evaluate_move_sequences_with_allocation(
@@ -1471,7 +1407,7 @@ Rcpp::List bg_cpp_allocation_evaluate_trace(
       seed,
       use_seed,
       fast_diagnostics};
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
   std::vector<AllocationTraceRow> trace_rows;
   // Reserve worst-case order-of-magnitude to reduce trace vector growth.
   trace_rows.reserve(static_cast<std::size_t>(std::max(total_budget, 0)) *
@@ -1530,7 +1466,7 @@ Rcpp::List bg_cpp_profile_rollout_runtime(
 
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const backgammonr::DiceRoll parsed_roll = backgammonr::parse_roll_list(roll);
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
 
   // Time legal move generation.
   auto tic = std::chrono::steady_clock::now();

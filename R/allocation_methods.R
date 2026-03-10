@@ -300,6 +300,129 @@ bg_as_named_numeric <- function(values, keys) {
   stats::setNames(as.numeric(values), as.character(keys))
 }
 
+bg_as_named_character <- function(values, keys) {
+  stats::setNames(as.character(values), as.character(keys))
+}
+
+bg_results_by_candidate <- function(x) {
+  results <- if (inherits(x, "bg_action_evaluation")) x$results else x
+  results <- as.data.frame(results, stringsAsFactors = FALSE)
+  if (nrow(results) == 0L || !"candidate_index" %in% names(results)) {
+    return(results)
+  }
+
+  results[order(results$candidate_index), , drop = FALSE]
+}
+
+bg_action_runtime_seconds <- function(evaluation) {
+  if (is.null(evaluation$runtime_seconds) || length(evaluation$runtime_seconds) == 0L) {
+    return(NA_real_)
+  }
+
+  as.numeric(evaluation$runtime_seconds[[1L]])
+}
+
+bg_candidate_label_lookup <- function(results) {
+  if (nrow(results) == 0L) {
+    return(stats::setNames(character(0L), character(0L)))
+  }
+
+  bg_as_named_character(results$move_label, results$candidate_index)
+}
+
+bg_top_two_values <- function(values) {
+  values <- sort(as.numeric(values), decreasing = TRUE)
+  if (length(values) == 0L) {
+    return(c(best = NA_real_, second_best = NA_real_))
+  }
+  if (length(values) == 1L) {
+    return(c(best = values[[1L]], second_best = values[[1L]]))
+  }
+
+  c(best = values[[1L]], second_best = values[[2L]])
+}
+
+bg_top_two_gap <- function(values) {
+  top_two <- bg_top_two_values(values)
+  if (anyNA(top_two)) {
+    return(NA_real_)
+  }
+
+  unname(top_two[["best"]] - top_two[["second_best"]])
+}
+
+bg_reference_snapshot <- function(reference) {
+  tab <- bg_results_by_candidate(reference)
+  estimate_values <- if (nrow(tab) == 0L || !"estimate" %in% names(tab)) numeric(0L) else tab$estimate
+  top_two <- bg_top_two_values(estimate_values)
+  difficulty_gap <- if (anyNA(top_two)) NA_real_ else unname(top_two[["best"]] - top_two[["second_best"]])
+
+  list(
+    table = tab,
+    values = estimate_values,
+    value_lookup = bg_as_named_numeric(estimate_values, tab$candidate_index),
+    label_lookup = bg_candidate_label_lookup(tab),
+    best_value = unname(top_two[["best"]]),
+    second_best_value = unname(top_two[["second_best"]]),
+    difficulty_gap = difficulty_gap,
+    difficulty_label = stratify_positions_by_difficulty(difficulty_gap)
+  )
+}
+
+bg_action_reference_metrics <- function(evaluation, reference_snapshot, reference_best_index) {
+  eval_table <- bg_results_by_candidate(evaluation)
+  if (nrow(eval_table) == 0L) {
+    return(list(
+      evaluation_table = eval_table,
+      chosen_index = NA_integer_,
+      chosen_move_label = NA_character_,
+      chosen_estimate = NA_real_,
+      chosen_allocation_count = NA_integer_,
+      chosen_prob_best = NA_real_,
+      chosen_expected_regret = NA_real_,
+      chosen_reference_value = NA_real_,
+      correct_selection = NA,
+      simple_regret = NA_real_,
+      mse = NA_real_,
+      n_legal_moves = 0L
+    ))
+  }
+
+  if (!identical(eval_table$candidate_index, reference_snapshot$table$candidate_index)) {
+    stop("Internal error: candidate sets differ between evaluation and reference runs.", call. = FALSE)
+  }
+
+  chosen_row <- bg_recommended_row(evaluation)
+  chosen_index <- evaluation$recommended_index
+  chosen_reference_value <- reference_snapshot$value_lookup[[as.character(chosen_index)]]
+  if (is.null(chosen_reference_value)) {
+    stop("Internal error: selected candidate was not found in reference lookup.", call. = FALSE)
+  }
+
+  list(
+    evaluation_table = eval_table,
+    chosen_index = chosen_index,
+    chosen_move_label = chosen_row$move_label[[1L]],
+    chosen_estimate = chosen_row$estimate[[1L]],
+    chosen_allocation_count = if ("allocation_count" %in% names(chosen_row)) {
+      chosen_row$allocation_count[[1L]]
+    } else {
+      NA_integer_
+    },
+    chosen_prob_best = if ("prob_best" %in% names(chosen_row)) chosen_row$prob_best[[1L]] else NA_real_,
+    chosen_expected_regret = if ("posterior_expected_regret" %in% names(chosen_row)) {
+      chosen_row$posterior_expected_regret[[1L]]
+    } else {
+      NA_real_
+    },
+    chosen_reference_value = chosen_reference_value,
+    correct_selection = chosen_index == reference_best_index,
+    simple_regret = compute_simple_regret(chosen_reference_value, reference_snapshot$best_value),
+    mse = compute_mse(eval_table$estimate, reference_snapshot$values),
+    n_legal_moves = nrow(eval_table)
+  )
+}
+
 bg_build_allocation_trace <- function(
     board,
     legal_moves,
@@ -1032,7 +1155,7 @@ approximate_action_reference <- function(...) {
 
 bg_extract_truth_values <- function(truth) {
   if (inherits(truth, "bg_action_evaluation")) {
-    tab <- truth$results[order(truth$results$candidate_index), , drop = FALSE]
+    tab <- bg_results_by_candidate(truth)
     return(tab$estimate)
   }
 
@@ -1481,28 +1604,23 @@ benchmark_allocation_methods <- function(
       seed = bg_derive_seed(seed, case_id, "truth")
     )
 
-    truth_tab <- truth_eval$results[order(truth_eval$results$candidate_index), , drop = FALSE]
-    truth_values <- truth_tab$estimate
-    truth_lookup <- stats::setNames(truth_values, truth_tab$candidate_index)
-    truth_label_lookup <- stats::setNames(as.character(truth_tab$move_label), truth_tab$candidate_index)
-    best_index <- truth_tab$candidate_index[[which.max(truth_values)]]
-    best_move_label <- truth_label_lookup[[as.character(best_index)]]
-    sorted_truth <- sort(truth_values, decreasing = TRUE)
-    second_best <- if (length(sorted_truth) > 1L) sorted_truth[[2L]] else sorted_truth[[1L]]
-    difficulty_gap <- sorted_truth[[1L]] - second_best
-    difficulty_label <- stratify_positions_by_difficulty(difficulty_gap)
+    truth_info <- bg_reference_snapshot(truth_eval)
+    best_index <- truth_info$table$candidate_index[[which.max(truth_info$values)]]
+    best_move_label <- truth_info$label_lookup[[as.character(best_index)]]
+    difficulty_gap <- truth_info$difficulty_gap
+    difficulty_label <- truth_info$difficulty_label
 
     truth_rows[[truth_id]] <- data.frame(
       case_id = case_id,
       n_legal_moves = n_legal_moves,
       reference_best_index = best_index,
       reference_best_move_label = best_move_label,
-      reference_best_value = sorted_truth[[1L]],
-      reference_second_best_value = second_best,
+      reference_best_value = truth_info$best_value,
+      reference_second_best_value = truth_info$second_best_value,
       truth_best_index = best_index,
       truth_best_move_label = best_move_label,
-      truth_best_value = sorted_truth[[1L]],
-      truth_second_best_value = second_best,
+      truth_best_value = truth_info$best_value,
+      truth_second_best_value = truth_info$second_best_value,
       difficulty_gap = difficulty_gap,
       difficulty_label = difficulty_label,
       stringsAsFactors = FALSE
@@ -1514,7 +1632,6 @@ benchmark_allocation_methods <- function(
       for (dice_mode in dice_modes) {
         for (crn in crn_values) {
           for (method in methods) {
-            start <- as.numeric(proc.time()[3L])
             eval <- bg_evaluate_actions_method(
               board = board,
               method = method,
@@ -1532,18 +1649,12 @@ benchmark_allocation_methods <- function(
               crn = crn,
               seed = bg_derive_seed(seed, case_id, method, budget, dice_mode, crn)
             )
-            runtime_seconds <- as.numeric(proc.time()[3L] - start)
-
-            eval_tab <- eval$results[order(eval$results$candidate_index), , drop = FALSE]
-            selected_index <- eval$recommended_index
-            selected_move_label <- eval_tab$move_label[[match(selected_index, eval_tab$candidate_index)]]
-            selected_truth_value <- truth_lookup[[as.character(selected_index)]]
-            if (is.null(selected_truth_value)) {
-              stop("Internal error: selected move index not found in truth table.", call. = FALSE)
-            }
-            best_truth_value <- max(truth_values)
-            simple_regret <- compute_regret(selected_truth_value, best_truth_value)
-            mse <- compute_mse(eval_tab$estimate, truth_values)
+            runtime_seconds <- bg_action_runtime_seconds(eval)
+            metrics <- bg_action_reference_metrics(
+              evaluation = eval,
+              reference_snapshot = truth_info,
+              reference_best_index = best_index
+            )
 
             rows[[row_id]] <- data.frame(
               case_id = case_id,
@@ -1551,20 +1662,20 @@ benchmark_allocation_methods <- function(
               total_budget = budget,
               dice_mode = dice_mode,
               crn = crn,
-              n_legal_moves = n_legal_moves,
-              chosen_index = selected_index,
-              chosen_move_label = selected_move_label,
+              n_legal_moves = metrics$n_legal_moves,
+              chosen_index = metrics$chosen_index,
+              chosen_move_label = metrics$chosen_move_label,
               reference_best_index = best_index,
               reference_best_move_label = best_move_label,
               truth_best_index = best_index,
               truth_best_move_label = best_move_label,
-              correct_selection = selected_index == best_index,
-              selected_reference_value = selected_truth_value,
-              best_reference_value = best_truth_value,
-              selected_truth_value = selected_truth_value,
-              best_truth_value = best_truth_value,
-              simple_regret = simple_regret,
-              mse = mse,
+              correct_selection = metrics$correct_selection,
+              selected_reference_value = metrics$chosen_reference_value,
+              best_reference_value = truth_info$best_value,
+              selected_truth_value = metrics$chosen_reference_value,
+              best_truth_value = truth_info$best_value,
+              simple_regret = metrics$simple_regret,
+              mse = metrics$mse,
               runtime_seconds = runtime_seconds,
               difficulty_gap = difficulty_gap,
               difficulty_label = difficulty_label,

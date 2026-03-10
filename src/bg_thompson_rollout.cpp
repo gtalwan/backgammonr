@@ -1,11 +1,10 @@
 #include "bg_thompson_rollout.h"
 
-#include <cstdint>
-#include <random>
 #include <stdexcept>
 #include <vector>
 
 #include "bg_allocation.h"
+#include "bg_rng.h"
 
 // -----------------------------------------------------------------------------
 // bg_thompson_rollout.cpp
@@ -18,31 +17,6 @@
 //   bg_allocation.cpp to avoid duplicated logic.
 // - Here, we only fix method = "thompson" and shape the returned fields.
 // -----------------------------------------------------------------------------
-
-namespace {
-
-// Function: init_rng
-// Purpose: Build per-call RNG stream for Thompson rollout wrappers.
-// Called by: bg_cpp_thompson_rollout_move_evaluate(),
-// bg_cpp_thompson_rollout_move_choice().
-// Notes: Keeps deterministic behavior when seed is supplied.
-std::mt19937 init_rng(const int seed, const bool use_seed) {
-  std::mt19937 rng;
-
-  if (use_seed) {
-    if (seed < 0) {
-      throw std::range_error("`seed` must be nonnegative when supplied.");
-    }
-    rng.seed(static_cast<std::uint32_t>(seed));
-  } else {
-    std::random_device rd;
-    rng.seed(rd());
-  }
-
-  return rng;
-}
-
-}  // namespace
 
 namespace backgammonr {
 
@@ -165,7 +139,7 @@ Rcpp::DataFrame bg_cpp_thompson_rollout_move_evaluate(
       backgammonr::parse_move_sequence_vector(legal_moves);
   const backgammonr::RolloutConfig config{rollout_budget, rollout_policy, max_rollout_turns};
   // Build local RNG stream.
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
 
   // Return the full standardized evaluation table for consistency with
   // evaluate_actions_thompson() R-side wrappers.
@@ -197,7 +171,7 @@ Rcpp::List bg_cpp_thompson_rollout_move_choice(
       backgammonr::parse_move_sequence_vector(legal_moves);
   const backgammonr::RolloutConfig config{rollout_budget, rollout_policy, max_rollout_turns};
   // Build local RNG stream.
-  std::mt19937 rng = init_rng(seed, use_seed);
+  std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
 
   // Compute Thompson-selected move and convert back to R representation.
   return backgammonr::move_sequence_to_list(
