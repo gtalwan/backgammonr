@@ -1,0 +1,37 @@
+Package: backgammonr
+Type: Package
+Title: Thompson-Centered Finite-Budget Backgammon Rollout Allocation
+Version: 0.2.0
+Authors@R:
+    person(given = "OpenAI",
+           family = "Assistant",
+           role = c("aut", "cre"),
+           email = "assistant@example.com")
+Author: OpenAI Assistant [aut, cre]
+Maintainer: OpenAI Assistant <assistant@example.com>
+Description: Statistical-computing tools for finite-budget rollout allocation
+    in backgammon, centered on Thompson sampling for best-action
+    identification under simulation noise. The package combines a C++
+    backgammon engine with Monte Carlo action-evaluation infrastructure,
+    high-budget reference estimation, and baseline comparison methods
+    (equal/UCB/OCBA/greedy). Outputs emphasize proxy probability of correct
+    selection, simple regret, value-estimation error, and runtime
+    speed-accuracy tradeoffs.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Imports:
+    Rcpp
+LinkingTo:
+    Rcpp,
+    RcppArmadillo
+Suggests:
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+VignetteBuilder:
+    knitr
+Config/testthat/edition: 3
+SystemRequirements: C++17

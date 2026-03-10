@@ -1,0 +1,206 @@
+---
+title: "Backgammon Basics with Simple Outputs"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Backgammon Basics with Simple Outputs}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+This vignette is intentionally modest. The goal is not to show every feature.
+The goal is to make the basic mechanics readable.
+
+# 1. Set up one decision instance
+
+```{r}
+library(backgammonr)
+
+board <- bg_initial_board()
+roll <- bg_roll(1L, 6L)
+
+explain_position(board, roll)
+```
+
+That sentence is a good way to anchor everything else. We are studying one board
+state and one realized roll.
+
+# 2. Print the board and the roll
+
+```{r}
+bg_print_board(board)
+print(roll)
+```
+
+Read this output first, before looking at any allocation method. If the board
+and roll are not clear, the rest of the analysis will feel abstract.
+
+# 3. List a few legal moves
+
+```{r}
+legal <- generate_legal_moves(board, roll)
+
+legal_summary <- summarize_legal_moves(
+  legal,
+  max_candidates = 6L,
+  print_table = FALSE
+)
+
+legal_summary
+```
+
+Why this output is friendly:
+
+- it shows only a few columns,
+- the move label is easier to read than a deeply nested internal object,
+- `max_candidates` keeps the display manageable.
+
+# 4. Apply one move and inspect the result
+
+```{r}
+move1 <- legal[[1L]]
+board_after <- apply_move(board, move1)
+
+cat("MOVE\n")
+print(move1)
+
+cat("\nBEFORE\n")
+bg_print_board(board)
+
+cat("\nAFTER\n")
+bg_print_board(board_after)
+```
+
+This is one of the most useful beginner checks in the package. It turns a move
+label into a concrete state transition.
+
+# 5. Simulate one short game without printing everything
+
+A single game is useful for intuition, but the full raw history can be more than
+you need at first. So the safest pattern is:
+
+1. simulate the game,
+2. print a one-row overview,
+3. inspect only the first few history rows.
+
+```{r}
+one_game <- simulate_game(
+  state = board,
+  policy_white = "random",
+  policy_black = "random",
+  max_turns = 80L,
+  seed = 1L
+)
+
+game_overview <- data.frame(
+  player_1 = one_game$player1_selection,
+  player_2 = one_game$player2_selection,
+  n_turns = one_game$n_turns,
+  game_over = one_game$game_over,
+  winner = one_game$winner,
+  turn_limit_reached = one_game$turn_limit_reached,
+  stringsAsFactors = FALSE
+)
+
+game_overview
+
+head(
+  one_game$history[, c(
+    "turn", "player", "selection", "die1", "die2",
+    "n_legal_moves", "chosen_n_steps", "game_over", "winner"
+  )],
+  8L
+)
+```
+
+This keeps the output readable while still showing how turn-level simulation
+works.
+
+# 6. Run many games and summarize them compactly
+
+When the goal is repeated simulation, `simulate_matchup()` is usually a better
+tool than calling `simulate_game()` in a loop. It returns one row per game plus
+a compact summary.
+
+```{r}
+random_matchup <- simulate_matchup(
+  player1 = "random",
+  player2 = "random",
+  n_games = 100L,
+  board = board,
+  max_turns = 150L,
+  seed = 2L
+)
+
+summary(random_matchup)[, c(
+  "n_games",
+  "completed_games",
+  "player1_wins",
+  "player2_wins",
+  "player1_win_rate",
+  "player2_win_rate",
+  "mean_turns"
+)]
+
+head(
+  random_matchup$games[, c(
+    "game_id",
+    "winner_label",
+    "n_turns",
+    "game_over",
+    "turn_limit_reached"
+  )],
+  8L
+)
+```
+
+This is a much better first look than a giant raw table.
+
+# 7. Use a stronger player only after the basics are clear
+
+Once the mechanics are comfortable, you can compare a rollout-based player
+against a simple baseline.
+
+```{r}
+thompson_matchup <- simulate_matchup(
+  player1 = "thompson_rollout",
+  player2 = "random",
+  n_games = 100L,
+  board = board,
+  max_turns = 150L,
+  rollout_budget = 16L,
+  rollout_policy = "random",
+  max_rollout_turns = 150L,
+  seed = 3L
+)
+
+summary(thompson_matchup)[, c(
+  "n_games",
+  "completed_games",
+  "player1_wins",
+  "player2_wins",
+  "player1_win_rate",
+  "player2_win_rate",
+  "mean_turns"
+)]
+```
+
+This is a good bridge from mechanics to the later statistical vignettes:
+a local allocation policy becomes a player only when it is used repeatedly in
+full games.
+
+# 8. What this vignette deliberately avoided
+
+This vignette did **not** try to show:
+
+- every column available in every object,
+- giant history tables,
+- all move-evaluation methods,
+- all benchmark helpers.
+
+That is intentional. The point here is to make the package feel easy to read at
+the mechanics level. The heavier statistical workflow belongs in the next
+vignette.

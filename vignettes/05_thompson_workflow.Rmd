@@ -1,0 +1,485 @@
+---
+title: "Thompson Workflow: From One Decision to Broader Evidence"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Thompson Workflow: From One Decision to Broader Evidence}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+This vignette is the slow, Thompson-centered walk through the package.
+
+The main idea is to stay tied to the actual research question:
+
+> on one fixed local backgammon decision problem, what does finite-budget
+> Thompson sampling do, how should we interpret it, and how does it compare with
+> stronger reference evidence?
+
+# 1. Set the problem up once
+
+To avoid redundant code, we define the decision instance and the main simulation
+settings only once.
+
+```{r}
+library(backgammonr)
+
+board <- bg_initial_board()
+roll <- bg_roll(1L, 6L)
+
+rollout_policy <- "random"
+max_rollout_turns <- 250L
+seed <- 1L
+
+total_budget <- 1200L
+reference_budget <- 12000L   # deep run: use 30000L when feasible
+budget_grid <- c(128L, 256L, 512L, 1024L, 2048L)
+n_matchup_games <- 400L      # deep run: use 800L+ when feasible
+```
+
+This is the core pattern for the rest of the vignette:
+
+- keep the board fixed,
+- keep the roll fixed,
+- keep the rollout model fixed,
+- vary only the allocation budget or comparison method when needed.
+
+Approx runtime guidance:
+
+- quick/demo (`reference_budget = 4000`): roughly 1-4 minutes,
+- default (`reference_budget = 12000`): roughly 3-10 minutes,
+- deep (`reference_budget = 30000`): roughly 8-25 minutes.
+
+# 2. Start with the legal action set
+
+Before running Thompson sampling, inspect the action set it will allocate over.
+
+```{r}
+legal <- generate_legal_moves(board, roll)
+
+legal_view <- summarize_legal_moves(
+  legal,
+  max_candidates = 8L,
+  print_table = FALSE
+)
+
+legal_view
+```
+
+This matters because Thompson sampling is not choosing from a vague search
+space. It is choosing among these concrete legal actions.
+
+# 3. Run one finite-budget Thompson evaluation
+
+```{r}
+th <- evaluate_actions_thompson(
+  board = board,
+  roll = roll,
+  total_budget = total_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  fast_diagnostics = FALSE,
+  seed = seed
+)
+
+summary(th)
+```
+
+The one-row summary answers the first practical question: what move was
+recommended at this budget?
+
+# 4. Look at the top posterior summaries
+
+A one-row summary is not enough on its own. We also want to know which actions
+were still competitive.
+
+```{r}
+posterior_view <- compare_action_posteriors(th, top_n = 8L)
+
+posterior_view[, c(
+  "move_label",
+  "recommended",
+  "allocation_count",
+  "estimate",
+  "uncertainty_sd",
+  "prob_best",
+  "exp_regret"
+)]
+```
+
+This is the main compact table to read.
+
+Interpret the columns this way:
+
+- `move_label`: human-readable action,
+- `recommended`: whether this is the current leader,
+- `allocation_count`: how much budget Thompson gave it,
+- `estimate`: posterior mean estimate,
+- `uncertainty_sd`: remaining uncertainty,
+- `prob_best`: how plausible it still is that this action is best,
+- `exp_regret`: posterior expected regret if chosen.
+
+# 5. Turn the output into a sentence
+
+```{r}
+explain_move_evaluation(th)
+```
+
+This is a small but useful bridge between the statistical object and the human
+reading experience. Good workflow documents should use functions like this more,
+not less.
+
+# 6. Watch the allocation evolve
+
+A big advantage of this package is that it can expose the dynamics, not just the
+final answer.
+
+```{r}
+trace <- trace_thompson_allocation(
+  board = board,
+  roll = roll,
+  method = "thompson",
+  total_budget = total_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  trace_every = 40L,
+  seed = seed
+)
+
+trace$checkpoint_summary[, c(
+  "checkpoint",
+  "selected_move_label",
+  "leader_move_label",
+  "leader_estimate",
+  "leader_posterior_sd",
+  "leader_allocation_count"
+)]
+```
+
+This table is the easiest place to see whether Thompson sampling is behaving the
+way the theory vignette suggested:
+
+- does one action dominate early?
+- do challengers keep getting budget?
+- does the leader stabilize?
+
+# 7. Build a stronger proxy reference
+
+A finite-budget Thompson run is only part of the story. We also want a stronger
+reference estimate so that we can talk about regret and approximation quality.
+
+```{r}
+reference <- approximate_action_reference(
+  board = board,
+  roll = roll,
+  truth_budget = reference_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  seed = seed
+)
+
+certificate <- certify_reference_truth(reference = reference)
+
+certificate$certificate
+```
+
+This is where the workflow stays honest. The reference is stronger than the
+finite-budget run, but it is still simulated, so we check how well separated the
+top reference actions appear to be.
+
+# 8. Compare the finite-budget Thompson run with the reference
+
+```{r}
+comparison <- compare_thompson_to_reference(
+  board = board,
+  roll = roll,
+  method = "thompson",
+  total_budget = 512L,
+  reference = reference,
+  reference_certificate = certificate,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  seed = seed + 1L
+)
+
+comparison$summary
+```
+
+This one-row output is one of the most important in the package because it ties
+the main problem together:
+
+- finite budget,
+- Thompson recommendation,
+- stronger proxy reference,
+- regret and error metrics,
+- reference difficulty.
+
+# 9. Inspect the action-level comparison, but keep it compact
+
+```{r}
+action_view <- comparison$action_table[order(
+  -comparison$action_table$finite_allocation_count
+), ]
+
+action_view[, c(
+  "move_label",
+  "finite_recommended",
+  "reference_best",
+  "finite_allocation_count",
+  "finite_estimate",
+  "reference_estimate",
+  "abs_error"
+)][1:8, ]
+```
+
+This is much easier to read than dumping every column. It directly answers:
+
+- what did Thompson focus on?
+- did the recommended move match the reference-best move?
+- where was the remaining error concentrated?
+
+# 10. Study the budget tradeoff on the same problem
+
+One of the most important questions in the project is whether more budget really
+improves recommendation quality in a meaningful way.
+
+```{r}
+tradeoff <- study_budget_tradeoff(
+  board = board,
+  roll = roll,
+  method = "thompson",
+  budgets = budget_grid,
+  truth_budget = reference_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  fast_diagnostics = FALSE,
+  seed = seed + 2L
+)
+
+tradeoff$results[, c(
+  "total_budget",
+  "chosen_move_label",
+  "truth_best_move_label",
+  "correct_selection",
+  "simple_regret",
+  "mse",
+  "runtime_seconds"
+)]
+```
+
+This is the clearest budget story in the package. It lets you see:
+
+- whether the chosen move stabilizes,
+- whether simple regret shrinks,
+- whether MSE shrinks,
+- what runtime you paid for those improvements.
+
+# 11. Compare Thompson with baseline methods on the same budget
+
+The package should not present Thompson in isolation. Baselines matter.
+
+```{r}
+methods <- compare_methods_on_position(
+  board = board,
+  roll = roll,
+  methods = c("thompson", "equal", "ucb", "ocba", "greedy"),
+  total_budget = total_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  fast_diagnostics = FALSE,
+  seed = seed + 3L
+)
+
+methods$summary[, c(
+  "method",
+  "recommended_move_label",
+  "recommended_estimate",
+  "recommended_prob_best",
+  "recommended_expected_regret",
+  "recommended_allocation_count",
+  "runtime_seconds"
+)]
+```
+
+This does not settle the whole research question, but it is a very useful same-
+position, same-budget snapshot.
+
+# 12. Use Thompson as a player in many full games
+
+The single-decision workflow is the scientific center, but it is also useful to
+see what happens when Thompson-based move choice is embedded in many full games.
+
+```{r}
+thompson_matchup <- simulate_matchup(
+  player1 = "thompson_rollout",
+  player2 = "random",
+  n_games = n_matchup_games,
+  board = board,
+  max_turns = 150L,
+  rollout_budget = 16L,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = 150L,
+  seed = seed + 4L
+)
+
+summary(thompson_matchup)[, c(
+  "n_games",
+  "completed_games",
+  "player1_wins",
+  "player2_wins",
+  "player1_win_rate",
+  "player2_win_rate",
+  "mean_turns"
+)]
+```
+
+This is not the same question as the single-position evaluation. It is a broader
+application question: if Thompson-style move selection is used repeatedly, what
+kind of game-level behavior emerges?
+
+# 13. Variance-control sensitivity on the same instance
+
+Noise-control settings can change how quickly posterior quantities stabilize.
+This section keeps the same board and roll but varies `dice_mode` and `crn`.
+
+```{r}
+var_study <- study_variance_controls(
+  board = board,
+  roll = roll,
+  method = "thompson",
+  total_budget = 1200L,
+  dice_modes = c("iid", "stratified_first_roll", "stratified_first_two_rolls"),
+  crn_values = c(FALSE, TRUE),
+  truth_budget = reference_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  seed = seed + 5L
+)
+
+var_study$results[, c(
+  "dice_mode",
+  "crn",
+  "chosen_move_label",
+  "correct_selection",
+  "simple_regret",
+  "mse",
+  "runtime_seconds"
+)]
+```
+
+Interpret this as a sensitivity check, not a one-off winner table.
+
+# 14. Multi-case benchmark with enough simulation calls
+
+One instance is useful for interpretation, but robust behavior claims require
+multiple cases and larger total simulation counts.
+
+```{r}
+cases <- list(
+  bg_benchmark_case(bg_initial_board(), bg_roll(1L, 6L), case_id = "init_1_6"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(3L, 2L), case_id = "init_3_2"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(5L, 4L), case_id = "init_5_4"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(2L, 1L), case_id = "init_2_1"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(6L, 6L), case_id = "init_6_6"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(4L, 3L), case_id = "init_4_3")
+)
+
+bm <- benchmark_thompson(
+  cases = cases,
+  budgets = c(256L, 1024L, 4096L),
+  baselines = c("equal", "ucb", "ocba", "greedy"),
+  include_ttts = TRUE,
+  reference_budget = reference_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  seed = seed + 6L
+)
+
+print(bm)
+
+focus <- summarize_thompson_benchmark(bm)
+head(focus$thompson, 12L)
+head(focus$relative_to_thompson, 20L)
+head(focus$by_difficulty, 20L)
+```
+
+This loop is intentionally substantial: multiple cases, multiple budgets, and
+multiple baselines so state-dependent behavior is visible.
+
+# 15. Function-coverage map
+
+The workflow above covers the main user-facing path:
+
+- mechanics: `bg_initial_board()`, `bg_roll()`, `generate_legal_moves()`,
+  `summarize_legal_moves()`, `apply_move()`
+- finite-budget evaluation: `evaluate_actions_thompson()`,
+  `compare_action_posteriors()`, `summary()`, `explain_move_evaluation()`
+- dynamics: `trace_thompson_allocation()`, `plot_thompson_convergence()`
+- reference layer: `approximate_action_reference()`,
+  `certify_reference_truth()`, `compare_thompson_to_reference()`
+- budget studies: `study_budget_tradeoff()`, `study_variance_controls()`
+- benchmarks: `compare_methods_on_position()`, `benchmark_thompson()`,
+  `summarize_thompson_benchmark()`
+- game-level application: `simulate_matchup()`
+
+# 16. Result-discussion outline
+
+For reports and presentations, cover results in this order:
+
+1. define instance and action-set context,
+2. state budget and rollout-model settings,
+3. report recommendation with uncertainty,
+4. report finite-vs-reference metrics (PCS/regret/MSE),
+5. show allocation-dynamics evidence,
+6. compare against baselines at matched budgets,
+7. report runtime tradeoffs,
+8. state limitations (reference uncertainty, difficulty, model dependence).
+
+# 17. Future optimization and model directions
+
+Useful next directions (hypotheses, not claims):
+
+- multi-core rollout batching for large benchmark grids,
+- richer posterior models for bounded non-Bernoulli rewards,
+- expanded TTTS/gap-aware/stopping-rule variants,
+- CRN-aware Bayesian allocation refinements,
+- tighter reference-certification diagnostics.
+
+# 18. What this workflow is trying to teach
+
+The workflow is intentionally ordered.
+
+1. fix the decision instance,
+2. inspect the legal actions,
+3. run finite-budget Thompson,
+4. inspect the posterior table,
+5. trace the allocation,
+6. build a stronger reference,
+7. compare finite budget against reference,
+8. study the budget tradeoff,
+9. compare with baselines,
+10. embed the method in many games.
+
+That order matters because it keeps every code block tied to the main problem.
+The goal is not to show more functions than necessary. The goal is to make the
+research question legible.
+
+# 19. A final reading rule
+
+Whenever a Thompson result looks impressive, ask:
+
+- was the reference credible?
+- was the state easy or hard?
+- did the result persist as the budget increased?
+- did the method still look strong against the baselines?
+
+Whenever a Thompson result looks unstable, ask:
+
+- was the state a genuine near tie?
+- did the trace show early luck and later correction?
+- would a larger budget or stronger variance control change the picture?
+
+That is the mindset this package is built to support.

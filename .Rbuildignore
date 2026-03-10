@@ -1,0 +1,16 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^README\.Rmd$
+^\.github$
+^\.DS_Store$
+^\.RData$
+^\.Rhistory$
+^\.rlib$
+^\.r-lib$
+^\.r-lib-baseline$
+^\.\.Rcheck$
+^backgammonr\.Rcheck$
+^.*\.zip$
+^tests/testthat/Rplots\.pdf$
+^src/.*\.(o|so)$
+^vignettes/_example_outputs$

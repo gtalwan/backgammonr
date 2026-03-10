@@ -1,0 +1,21 @@
+Local decision instance:
+
+Position with turn player_1 and roll 1-6. Number of legal candidate moves: 19. 
+
+<bg_board_ascii>
+turn: player_1
+perspective: player_1
+bar:  p1=0 p2=0
+off:  p1=0 p2=0
+
+Top (24 -> 13)
+    24    23    22    21    20    19    18    17    16    15    14    13
+    X2     .     .     .     .    O5     .    O3     .     .     .    X5
+Bottom (12 -> 1)
+    12    11    10     9     8     7     6     5     4     3     2     1
+    O5     .     .     .    X3     .    X5     .     .     .     .    O2
+
+<bg_roll>
+dice:     1 6
+double:   no
+expanded: 1 6

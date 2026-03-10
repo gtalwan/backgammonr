@@ -1,0 +1,642 @@
+---
+title: "Main Question Example: Thompson at Finite Budget vs High Reference"
+output: rmarkdown::html_vignette
+params:
+  run_code: false
+  quick_mode: true
+vignette: >
+  %\VignetteIndexEntry{Main Question Example: Thompson at Finite Budget vs High Reference}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+if (!exists("params")) {
+  params <- list(run_code = FALSE, quick_mode = TRUE)
+}
+run_code <- isTRUE(params$run_code)
+quick_mode <- isTRUE(params$quick_mode)
+options(bg_quick_mode = quick_mode)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = run_code,
+  fig.width = 7.5,
+  fig.height = 4.8
+)
+```
+
+This document is a single, self-contained research workflow focused on one
+question:
+
+> with a finite rollout budget, does Thompson sampling allocate simulation
+> effort in a statistically sensible way, and how close does it get to a
+> stronger high-budget reference estimate?
+
+It is centered on these functions:
+
+- `bg_initial_board()`
+- `bg_roll()`
+- `generate_legal_moves()`
+- `evaluate_actions_thompson()`
+- `approximate_action_reference()`
+- `compare_thompson_to_reference()`
+- `study_budget_tradeoff()`
+- `study_variance_controls()`
+- `summarize_thompson_benchmark()`
+
+Additional helper functions are included where they improve interpretation:
+
+- `bg_print_board()`, `bg_plot_board()`
+- `compare_action_posteriors()`, `explain_move_evaluation()`
+- `trace_thompson_allocation()`, `plot_thompson_convergence()`
+- `compare_methods_on_position()`
+- `bg_plot_budget_stability()`
+- `benchmark_thompson()`, `plot_thompson_vs_baselines()`
+
+# 1. Statistical framing before code
+
+Fix one local decision instance $d = (s, r)$ with board state $s$ and realized
+roll $r$. Let legal actions be $A_d = \{1, \dots, K\}$. For each action $i$,
+rollout reward $Y_i \in [0,1]$ has mean
+
+$$
+\mu_i = \mathbb{E}[Y_i].
+$$
+
+The rollout-model best action is
+
+$$
+a^* = \arg\max_i \mu_i.
+$$
+
+A finite-budget method uses total budget $N$ and returns recommendation
+$\hat a_N$. Core evaluation quantities are:
+
+- probability of correct selection (PCS):
+$$
+\Pr(\hat a_N = a^*)
+$$
+- simple regret:
+$$
+\mu_{a^*} - \mu_{\hat a_N}
+$$
+- value-estimation error, often summarized by MSE.
+
+In this package, we approximate $a^*$ using a high-budget reference estimate,
+not exact truth.
+
+# 2. Thompson intuition in this package
+
+Thompson sampling maintains posterior uncertainty for each action value, samples
+one draw per action, and allocates the next rollout to the sampled leader.
+
+Conceptually:
+
+1. maintain posterior for each $\mu_i$,
+2. draw $\tilde\mu_i$ from each posterior,
+3. allocate next rollout to $\arg\max_i \tilde\mu_i$,
+4. update posterior for sampled action.
+
+Why this matters here:
+
+- clearly weak actions should lose allocation over time,
+- plausible leaders should keep receiving budget,
+- hard near-tie states should show slower stabilization.
+
+# 3. Set one fixed decision instance and budgets
+
+Approx runtime guidance (laptop-class machine):
+
+- quick run: `reference_budget = 12000` and smaller budget grids,
+- deep run: `reference_budget = 30000` and larger budget grids.
+
+```{r}
+library(backgammonr)
+
+board <- bg_initial_board()
+roll <- bg_roll(1L, 6L)
+
+rollout_policy <- "random"
+max_rollout_turns <- if (isTRUE(getOption("bg_quick_mode", TRUE))) 250L else 300L
+seed <- 11L
+
+finite_budget <- if (isTRUE(getOption("bg_quick_mode", TRUE))) 1200L else 2000L
+reference_budget <- if (isTRUE(getOption("bg_quick_mode", TRUE))) 12000L else 30000L
+
+budget_grid <- if (isTRUE(getOption("bg_quick_mode", TRUE))) {
+  c(128L, 256L, 512L, 1024L, 2048L)
+} else {
+  c(128L, 256L, 512L, 1024L, 2048L, 4096L)
+}
+
+benchmark_budgets <- if (isTRUE(getOption("bg_quick_mode", TRUE))) c(256L, 1024L) else c(256L, 1024L, 4096L)
+trace_every <- if (isTRUE(getOption("bg_quick_mode", TRUE))) 120L else 80L
+```
+
+Interpretation: all comparisons below are conditioned on the same `board`,
+`roll`, rollout policy, and horizon.
+
+# 4. Print and plot the board and roll
+
+```{r}
+bg_print_board(board)
+print(roll)
+bg_plot_board(board)
+```
+
+Use both:
+
+- `bg_print_board()` for exact textual state,
+- `bg_plot_board()` for quick visual orientation.
+
+# 5. Generate legal actions and inspect action space
+
+```{r}
+legal <- generate_legal_moves(board, roll)
+
+legal_view <- summarize_legal_moves(
+  legal,
+  max_candidates = 10L,
+  print_table = FALSE
+)
+
+legal_view[, c("candidate_index", "move_label", "n_steps")]
+
+# Optional visual move diagnostics
+bg_plot_legal_moves(board, roll)
+```
+
+Interpretation question: how large and how structured is the action set that
+Thompson must allocate over?
+
+# 6. Run one finite-budget Thompson evaluation
+
+```{r}
+th <- evaluate_actions_thompson(
+  board = board,
+  roll = roll,
+  total_budget = finite_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  fast_diagnostics = FALSE,
+  seed = seed
+)
+
+print(th)
+summary(th)
+compare_action_posteriors(th, top_n = 8L)[, c(
+  "move_label", "recommended", "allocation_count",
+  "estimate", "uncertainty_sd", "prob_best", "exp_regret"
+)]
+
+explain_move_evaluation(th)
+```
+
+Interpretation:
+
+- `allocation_count`: where finite budget went,
+- `estimate` + `uncertainty_sd`: current value and uncertainty,
+- `prob_best`: posterior plausibility that action is best,
+- `exp_regret`: posterior downside if that action were chosen.
+
+# 7. Compare Thompson against baseline methods at same budget
+
+This gives a same-instance, same-budget cross-method snapshot.
+
+```{r}
+methods <- compare_methods_on_position(
+  board = board,
+  roll = roll,
+  methods = c("thompson", "equal", "ucb", "ocba", "greedy", "ttts"),
+  total_budget = finite_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  fast_diagnostics = FALSE,
+  seed = seed + 1L
+)
+
+methods$summary[, c(
+  "method",
+  "recommended_move_label",
+  "recommended_estimate",
+  "recommended_prob_best",
+  "recommended_expected_regret",
+  "recommended_allocation_count",
+  "estimate_gap_top2",
+  "runtime_seconds"
+)]
+```
+
+Interpretation: this is not a final benchmark, but it is a clean first check of
+whether Thompson is competitive on this specific state.
+
+# 8. Trace Thompson allocation dynamics over time
+
+```{r}
+tr <- trace_thompson_allocation(
+  board = board,
+  roll = roll,
+  method = "thompson",
+  total_budget = finite_budget,
+  trace_every = trace_every,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  seed = seed + 2L
+)
+
+tr$checkpoint_summary[, c(
+  "checkpoint",
+  "selected_move_label",
+  "leader_move_label",
+  "leader_estimate",
+  "leader_posterior_sd",
+  "leader_allocation_count"
+)]
+
+plot_thompson_convergence(tr, metric = "allocation_count")
+plot_thompson_convergence(tr, metric = "estimate")
+```
+
+Interpretation questions:
+
+- does allocation concentrate too early?
+- do challengers keep some budget in hard states?
+- does the leader stabilize as evidence accumulates?
+
+# 9. Plot recommendation stability across budgets
+
+This is an explicit instability/mistake diagnostic.
+
+```{r}
+bg_plot_budget_stability(
+  board = board,
+  roll = roll,
+  budgets = budget_grid,
+  methods = c("thompson", "equal", "ucb"),
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  seed = seed + 3L
+)
+```
+
+Interpretation:
+
+- low-budget flips are expected in hard states,
+- what matters is whether instability shrinks as budget grows.
+
+# 10. Build a high-budget reference estimate and certify it
+
+```{r}
+ref <- approximate_action_reference(
+  board = board,
+  roll = roll,
+  truth_budget = reference_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  seed = seed
+)
+
+cert <- certify_reference_truth(reference = ref)
+cert$certificate
+```
+
+Important interpretation rule: reference is a proxy truth. Certification helps
+flag when top-two separation is weak.
+
+# 11. Compare finite Thompson output to the reference
+
+```{r}
+cmp <- compare_thompson_to_reference(
+  board = board,
+  roll = roll,
+  method = "thompson",
+  total_budget = finite_budget,
+  reference = ref,
+  reference_certificate = cert,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  seed = seed + 4L
+)
+
+cmp$summary[, c(
+  "method", "total_budget", "reference_budget",
+  "proxy_pcs", "simple_regret", "mse",
+  "finite_runtime_seconds", "reference_runtime_seconds",
+  "difficulty_label", "reference_certified"
+)]
+
+cmp_actions <- cmp$action_table[order(-cmp$action_table$finite_allocation_count), c(
+  "move_label", "finite_recommended", "reference_best",
+  "finite_allocation_count", "finite_estimate",
+  "reference_estimate", "abs_error"
+)]
+
+head(cmp_actions, 10L)
+
+plot(
+  cmp_actions$finite_allocation_count,
+  cmp_actions$abs_error,
+  pch = 19,
+  col = ifelse(cmp_actions$finite_recommended, "#2E86AB", "#444444"),
+  xlab = "Finite allocation count",
+  ylab = "Absolute error vs reference",
+  main = "Where finite-budget error remains"
+)
+grid()
+
+# Richer finite-vs-reference diagnostics
+cmp_diag <- cmp$action_table[, c(
+  "move_label", "finite_recommended", "reference_best",
+  "finite_allocation_count", "finite_estimate", "finite_posterior_sd",
+  "reference_estimate", "abs_error"
+)]
+
+old_par <- par(no.readonly = TRUE)
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+
+# (1) Calibration-style scatter: finite estimate vs reference estimate
+plot(
+  cmp_diag$reference_estimate,
+  cmp_diag$finite_estimate,
+  pch = 19,
+  col = ifelse(cmp_diag$finite_recommended, "#2E86AB", "#444444"),
+  xlab = "Reference estimate",
+  ylab = "Finite Thompson estimate",
+  main = "Finite vs reference (action-level)"
+)
+abline(0, 1, lty = 2, col = "red")
+text(
+  cmp_diag$reference_estimate,
+  cmp_diag$finite_estimate,
+  labels = seq_len(nrow(cmp_diag)),
+  pos = 3,
+  cex = 0.7
+)
+
+# (2) Sorted absolute errors by action
+ord_err <- order(cmp_diag$abs_error, decreasing = TRUE)
+err_sorted <- cmp_diag[ord_err, , drop = FALSE]
+plot(
+  err_sorted$abs_error,
+  seq_len(nrow(err_sorted)),
+  pch = 19,
+  yaxt = "n",
+  xlab = "Absolute error",
+  ylab = "Action",
+  main = "Largest finite-vs-reference errors"
+)
+segments(0, seq_len(nrow(err_sorted)), err_sorted$abs_error, seq_len(nrow(err_sorted)))
+axis(2, at = seq_len(nrow(err_sorted)), labels = err_sorted$move_label, las = 1, cex.axis = 0.65)
+
+# (3) Posterior uncertainty vs absolute error
+plot(
+  cmp_diag$finite_posterior_sd,
+  cmp_diag$abs_error,
+  pch = 19,
+  cex = pmax(0.7, sqrt(cmp_diag$finite_allocation_count / max(cmp_diag$finite_allocation_count))),
+  col = ifelse(cmp_diag$reference_best, "#C0392B", "#444444"),
+  xlab = "Finite posterior SD",
+  ylab = "Absolute error vs reference",
+  main = "Uncertainty-error relationship"
+)
+legend(
+  "topright",
+  legend = c("Reference-best action", "Other actions"),
+  col = c("#C0392B", "#444444"),
+  pch = 19,
+  bty = "n",
+  cex = 0.8
+)
+
+# (4) Rank agreement: finite ranking vs reference ranking
+rank_df <- cmp_diag
+rank_df$finite_rank <- rank(-rank_df$finite_estimate, ties.method = "first")
+rank_df$reference_rank <- rank(-rank_df$reference_estimate, ties.method = "first")
+plot(
+  rank_df$reference_rank,
+  rank_df$finite_rank,
+  pch = 19,
+  col = ifelse(rank_df$finite_recommended, "#2E86AB", "#444444"),
+  xlab = "Reference rank (1 = best)",
+  ylab = "Finite rank (1 = best)",
+  main = "Rank agreement"
+)
+abline(0, 1, lty = 2, col = "red")
+text(rank_df$reference_rank, rank_df$finite_rank, labels = seq_len(nrow(rank_df)), pos = 3, cex = 0.7)
+
+par(old_par)
+```
+
+Interpretation:
+
+- `proxy_pcs`: did finite recommendation match reference-best?
+- `simple_regret`: decision loss relative to reference-best value,
+- `mse`: whole action-vector estimation error,
+- error-vs-allocation plot: where finite information is still weak,
+- calibration scatter: whether finite action estimates track reference values,
+- sorted-error chart: which specific actions are hardest at this budget,
+- uncertainty-error plot: whether high posterior uncertainty aligns with larger
+  reference gaps,
+- rank-agreement plot: whether finite ordering is close to reference ordering.
+
+# 12. Study budget tradeoff directly
+
+```{r}
+trade <- study_budget_tradeoff(
+  board = board,
+  roll = roll,
+  method = "thompson",
+  budgets = budget_grid,
+  truth_budget = reference_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  fast_diagnostics = FALSE,
+  seed = seed + 5L
+)
+
+trade_view <- trade$results[, c(
+  "total_budget",
+  "chosen_move_label",
+  "truth_best_move_label",
+  "correct_selection",
+  "simple_regret",
+  "mse",
+  "runtime_seconds"
+)]
+
+trade_view
+
+old_par <- par(no.readonly = TRUE)
+par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
+
+plot(
+  trade_view$total_budget,
+  as.numeric(trade_view$correct_selection),
+  type = "b", pch = 19, ylim = c(-0.05, 1.05),
+  xlab = "Budget", ylab = "Proxy PCS (0/1)", main = "Budget vs PCS"
+)
+plot(
+  trade_view$total_budget,
+  trade_view$simple_regret,
+  type = "b", pch = 19,
+  xlab = "Budget", ylab = "Simple regret", main = "Budget vs Regret"
+)
+plot(
+  trade_view$total_budget,
+  trade_view$mse,
+  type = "b", pch = 19,
+  xlab = "Budget", ylab = "MSE", main = "Budget vs MSE"
+)
+par(old_par)
+
+if (all(c("chosen_estimate", "chosen_truth_value", "truth_best_value") %in% names(trade$results))) {
+  gap_df <- trade$results[order(trade$results$total_budget), c(
+    "total_budget", "chosen_estimate", "chosen_truth_value", "truth_best_value"
+  )]
+  gap_df$finite_ref_gap <- gap_df$chosen_estimate - gap_df$chosen_truth_value
+  gap_df$to_ref_best_gap <- gap_df$truth_best_value - gap_df$chosen_truth_value
+
+  old_par <- par(no.readonly = TRUE)
+  par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+  plot(
+    gap_df$total_budget,
+    gap_df$finite_ref_gap,
+    type = "b", pch = 19,
+    xlab = "Budget",
+    ylab = "Chosen estimate - reference value",
+    main = "Finite-reference value gap"
+  )
+  abline(h = 0, lty = 2, col = "red")
+  plot(
+    gap_df$total_budget,
+    gap_df$to_ref_best_gap,
+    type = "b", pch = 19,
+    xlab = "Budget",
+    ylab = "Reference regret to best action",
+    main = "Gap to reference-best value"
+  )
+  par(old_par)
+}
+```
+
+Interpretation:
+
+- this is the key convergence story for one instance,
+- finite-budget non-monotonicity can happen, focus on trend,
+- include runtime when discussing quality gains,
+- the gap plots show whether chosen finite values and chosen actions approach the
+  reference trajectory as budget grows.
+
+# 13. Check variance-control sensitivity
+
+```{r}
+var_study <- study_variance_controls(
+  board = board,
+  roll = roll,
+  method = "thompson",
+  total_budget = finite_budget,
+  dice_modes = c("iid", "stratified_first_roll", "stratified_first_two_rolls"),
+  crn_values = c(FALSE, TRUE),
+  truth_budget = reference_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  fast_diagnostics = FALSE,
+  seed = seed + 6L
+)
+
+var_study$results[, c(
+  "dice_mode", "crn", "chosen_move_label",
+  "correct_selection", "simple_regret", "mse", "runtime_seconds"
+)]
+```
+
+Interpretation: if conclusions change radically across settings, report that
+explicitly.
+
+# 14. Run multi-case Thompson benchmark and summarize
+
+To use `summarize_thompson_benchmark()`, first run `benchmark_thompson()`.
+
+```{r}
+cases <- list(
+  bg_benchmark_case(bg_initial_board(), bg_roll(1L, 6L), case_id = "init_1_6"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(3L, 2L), case_id = "init_3_2"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(5L, 4L), case_id = "init_5_4"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(2L, 1L), case_id = "init_2_1"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(6L, 6L), case_id = "init_6_6"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(4L, 3L), case_id = "init_4_3")
+)
+
+if (isTRUE(getOption("bg_quick_mode", TRUE))) {
+  cases <- cases[1:3]
+}
+
+bm <- benchmark_thompson(
+  cases = cases,
+  budgets = benchmark_budgets,
+  baselines = c("equal", "ucb", "ocba", "greedy"),
+  include_ttts = TRUE,
+  reference_budget = reference_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  seed = seed + 7L
+)
+
+focus <- summarize_thompson_benchmark(bm)
+
+head(focus$thompson, 12L)
+head(focus$relative_to_thompson, 20L)
+head(focus$by_difficulty, 20L)
+
+plot_thompson_vs_baselines(bm, metric = "correct_selection_rate")
+plot_thompson_vs_baselines(bm, metric = "mean_simple_regret")
+plot_thompson_vs_baselines(bm, metric = "mean_runtime_seconds")
+```
+
+Interpretation:
+
+- this is where state-dependent strengths and weaknesses become visible,
+- report both favorable and unfavorable cells,
+- discuss quality and runtime together.
+
+# 15. Interpretation checklist (what to say in results)
+
+For each figure/table, answer explicitly:
+
+1. what statistical question this output is answering,
+2. whether the state appears easy/hard (`difficulty_label`, certification),
+3. whether finite Thompson is converging toward reference behavior,
+4. where errors remain and why they may remain,
+5. whether gains persist against baselines,
+6. what runtime cost was paid.
+
+# 16. What counts as encouraging vs cautionary
+
+Encouraging patterns:
+
+- allocation increasingly concentrates on plausible best actions,
+- regret and MSE generally decline with budget,
+- proxy PCS improves and recommendation flips decrease,
+- Thompson is competitive or stronger than baselines on many cells.
+
+Cautionary patterns:
+
+- persistent instability at moderate budgets,
+- large finite-vs-reference gaps despite high finite budget,
+- improvements that disappear outside one easy case,
+- strong dependence on one variance-control setting,
+- reference certification indicates unresolved near-tie ambiguity.
+
+# 17. Final takeaway
+
+This workflow is not about generating large tables. It is about
+finite-budget statistical decision evaluation:
+
+- define one concrete decision instance,
+- study Thompson allocation behavior,
+- compare to a stronger reference estimate,
+- check robustness across budgets and variance controls,
+- validate broader behavior across multiple benchmark cases.
+
+That is the core research use of this package.

@@ -1,0 +1,11 @@
+"game_id","winner_label","n_turns","game_over","turn_limit_reached"
+1,"player_1",71,TRUE,FALSE
+2,"player_2",86,TRUE,FALSE
+3,"player_2",48,TRUE,FALSE
+4,"player_1",51,TRUE,FALSE
+5,"player_1",69,TRUE,FALSE
+6,"player_1",103,TRUE,FALSE
+7,"player_1",45,TRUE,FALSE
+8,"player_2",66,TRUE,FALSE
+9,"player_1",51,TRUE,FALSE
+10,"player_2",90,TRUE,FALSE

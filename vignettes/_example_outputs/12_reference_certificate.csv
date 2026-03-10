@@ -1,0 +1,2 @@
+"n_actions","reference_best_index","reference_best_move_label","reference_second_index","reference_second_move_label","top_two_gap_estimate","top_two_gap_se","top_two_gap_lower_95","top_two_gap_upper_95","certified","difficulty_score","difficulty_label"
+10,5,"8->7, 13->7",9,"6->5, 8->2",0.0594059405940593,0.0491893564298913,-0.0370051980085275,0.155817079196646,FALSE,16.8333333333333,"moderate"

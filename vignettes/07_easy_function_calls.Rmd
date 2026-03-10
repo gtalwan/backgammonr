@@ -1,0 +1,482 @@
+---
+title: "Easy Function Calls: Setup + Step-by-Step Workflow"
+output: rmarkdown::html_vignette
+params:
+  run_code: false
+  quick_mode: true
+vignette: >
+  %\VignetteIndexEntry{Easy Function Calls: Setup + Step-by-Step Workflow}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+if (!exists("params")) {
+  params <- list(run_code = FALSE, quick_mode = TRUE)
+}
+run_code <- isTRUE(params$run_code)
+options(bg_quick_mode = isTRUE(params$quick_mode))
+
+fmt_elapsed <- function(tm) round(unname(tm[["elapsed"]]), 3)
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = run_code,
+  fig.width = 7.0,
+  fig.height = 4.5
+)
+```
+
+This document is a slow, practical walkthrough of the main user-facing calls.
+
+- It starts with package initialization from GitHub.
+- It then runs one function at a time.
+- Each section explains what question the function answers, which parameters matter,
+  and what output to inspect.
+- Timing (`system.time()`) is included so you can judge runtime costs.
+
+Expected runtime if you render with `run_code = TRUE`:
+
+- quick mode (`quick_mode = TRUE`): roughly 1 to 4 minutes on a laptop.
+- deep mode (`quick_mode = FALSE`): roughly 6 to 20+ minutes.
+
+# 0. Install and initialize the package
+
+If you are starting from GitHub, use this first. This chunk is shown with
+`eval = FALSE` so it does not reinstall every render.
+
+```{r, eval = FALSE}
+# Install helper once if needed.
+install.packages("remotes")
+
+# Install backgammonr from GitHub.
+remotes::install_github("gtalwan/backgammonr")
+
+# Load package and verify.
+library(backgammonr)
+packageVersion("backgammonr")
+```
+
+If you are inside the package source folder in RStudio and want local
+development mode:
+
+```{r, eval = FALSE}
+install.packages("devtools")
+devtools::load_all(".")
+```
+
+# 1. `bg_initial_board()`
+
+`bg_initial_board()` builds a standard starting board object. Use it when you
+want a reproducible, known state before testing any simulation method.
+
+```{r}
+library(backgammonr)
+
+tm <- system.time({
+  board <- bg_initial_board()
+})
+
+bg_print_board(board)
+
+data.frame(
+  function_call = "bg_initial_board",
+  elapsed_seconds = fmt_elapsed(tm)
+)
+```
+
+# 2. `bg_roll()`
+
+`bg_roll(d1, d2)` creates a realized dice roll object. In examples, fixed dice
+make results reproducible and easier to interpret than random draws.
+
+```{r}
+library(backgammonr)
+
+tm <- system.time({
+  roll <- bg_roll(1L, 6L)
+})
+
+print(roll)
+
+data.frame(
+  function_call = "bg_roll",
+  die_1 = 1L,
+  die_2 = 6L,
+  elapsed_seconds = fmt_elapsed(tm)
+)
+```
+
+# 3. `generate_legal_moves()`
+
+`generate_legal_moves(board, roll)` defines the action set for this decision.
+This is the candidate list over which Thompson (or any baseline) allocates
+finite simulation budget.
+
+```{r}
+library(backgammonr)
+
+board <- bg_initial_board()
+roll <- bg_roll(1L, 6L)
+
+tm <- system.time({
+  legal <- generate_legal_moves(board, roll)
+  legal_view <- summarize_legal_moves(legal, max_candidates = 10L, print_table = FALSE)
+})
+
+legal_view[, c("candidate_index", "move_label", "n_steps")]
+
+data.frame(
+  function_call = "generate_legal_moves",
+  n_candidates = nrow(legal_view),
+  elapsed_seconds = fmt_elapsed(tm)
+)
+```
+
+# 4. `evaluate_actions_thompson()`
+
+`evaluate_actions_thompson()` is the central finite-budget call. It allocates
+rollouts adaptively using posterior sampling and returns recommendation,
+allocation, estimated value, uncertainty, and probability-best style summaries.
+
+Key parameters to tune:
+
+- `total_budget`: total rollout budget available now.
+- `rollout_policy`: policy used during rollout simulation.
+- `max_rollout_turns`: rollout truncation limit.
+- `seed`: reproducibility for stochastic simulation.
+
+```{r}
+library(backgammonr)
+
+quick <- isTRUE(getOption("bg_quick_mode", TRUE))
+total_budget <- if (quick) 800L else 2000L
+max_rollout_turns <- if (quick) 220L else 300L
+rollout_policy <- "random"
+seed <- 11L
+
+params_eval <- data.frame(
+  total_budget = total_budget,
+  rollout_policy = rollout_policy,
+  max_rollout_turns = max_rollout_turns,
+  seed = seed
+)
+params_eval
+
+tm <- system.time({
+  th <- evaluate_actions_thompson(
+    board = bg_initial_board(),
+    roll = bg_roll(1L, 6L),
+    total_budget = total_budget,
+    rollout_policy = rollout_policy,
+    max_rollout_turns = max_rollout_turns,
+    fast_diagnostics = FALSE,
+    seed = seed
+  )
+})
+
+summary(th)[, c(
+  "method", "total_budget", "recommended_move_label",
+  "recommended_estimate", "recommended_prob_best",
+  "recommended_expected_regret", "recommended_allocation_count",
+  "runtime_seconds"
+)]
+
+th[["results"]][, c(
+  "move_label", "recommended", "allocation_count",
+  "estimate", "posterior_sd", "prob_best", "posterior_expected_regret"
+)]
+
+data.frame(
+  function_call = "evaluate_actions_thompson",
+  elapsed_seconds = fmt_elapsed(tm)
+)
+```
+
+# 5. `approximate_action_reference()`
+
+`approximate_action_reference()` builds a stronger high-budget reference estimate
+for the same board and roll. This is proxy truth, not exact truth, and should
+be interpreted with the reference certificate.
+
+```{r}
+library(backgammonr)
+
+quick <- isTRUE(getOption("bg_quick_mode", TRUE))
+truth_budget <- if (quick) 5000L else 20000L
+max_rollout_turns <- if (quick) 220L else 300L
+seed <- 21L
+
+params_ref <- data.frame(
+  truth_budget = truth_budget,
+  rollout_policy = "random",
+  max_rollout_turns = max_rollout_turns,
+  seed = seed
+)
+params_ref
+
+tm <- system.time({
+  ref <- approximate_action_reference(
+    board = bg_initial_board(),
+    roll = bg_roll(1L, 6L),
+    truth_budget = truth_budget,
+    rollout_policy = "random",
+    max_rollout_turns = max_rollout_turns,
+    seed = seed
+  )
+
+  cert <- certify_reference_truth(reference = ref)
+})
+
+ref[["results"]][1:8, c(
+  "move_label", "allocation_count", "estimate", "posterior_sd", "recommended"
+)]
+
+cert[["certificate"]][, c(
+  "reference_best_move_label",
+  "reference_second_move_label",
+  "top_two_gap_estimate",
+  "top_two_gap_lower_95",
+  "top_two_gap_upper_95",
+  "certified",
+  "difficulty_label"
+)]
+
+data.frame(
+  function_call = "approximate_action_reference",
+  elapsed_seconds = fmt_elapsed(tm)
+)
+```
+
+# 6. `compare_thompson_to_reference()`
+
+This function answers the core practical question: with a finite budget, how
+close is Thompson to the high-budget reference?
+
+Important detail: pass `reference` and `reference_certificate` if you already
+computed them. That avoids re-running expensive reference simulations.
+
+```{r}
+library(backgammonr)
+
+quick <- isTRUE(getOption("bg_quick_mode", TRUE))
+board <- bg_initial_board()
+roll <- bg_roll(1L, 6L)
+
+# Build once, then reuse.
+ref <- approximate_action_reference(
+  board = board,
+  roll = roll,
+  truth_budget = if (quick) 5000L else 20000L,
+  rollout_policy = "random",
+  max_rollout_turns = if (quick) 220L else 300L,
+  seed = 31L
+)
+cert <- certify_reference_truth(reference = ref)
+
+params_cmp <- data.frame(
+  method = "thompson",
+  total_budget = if (quick) 1000L else 2500L,
+  reference_budget = ref$truth_budget,
+  rollout_policy = "random",
+  seed = 32L
+)
+params_cmp
+
+tm <- system.time({
+  cmp <- compare_thompson_to_reference(
+    board = board,
+    roll = roll,
+    method = "thompson",
+    total_budget = if (quick) 1000L else 2500L,
+    reference = ref,
+    reference_certificate = cert,
+    rollout_policy = "random",
+    max_rollout_turns = if (quick) 220L else 300L,
+    seed = 32L
+  )
+})
+
+cmp[["summary"]][, c(
+  "method", "total_budget", "reference_budget",
+  "chosen_move_label", "reference_best_move_label",
+  "proxy_pcs", "simple_regret", "mse",
+  "reference_certified", "difficulty_label",
+  "finite_runtime_seconds", "reference_runtime_seconds"
+)]
+
+cmp[["action_table"]][, c(
+  "move_label", "finite_recommended", "reference_best",
+  "finite_allocation_count", "finite_estimate", "finite_prob_best",
+  "reference_estimate", "estimation_error", "abs_error"
+)][1:8, ]
+
+data.frame(
+  function_call = "compare_thompson_to_reference",
+  elapsed_seconds = fmt_elapsed(tm)
+)
+```
+
+# 7. `study_budget_tradeoff()`
+
+`study_budget_tradeoff()` repeats the finite-budget study over a budget grid.
+Use it to see how regret/MSE/selection improve as you add simulation budget.
+
+```{r}
+library(backgammonr)
+
+quick <- isTRUE(getOption("bg_quick_mode", TRUE))
+budgets <- if (quick) c(128L, 256L, 512L, 1024L) else c(128L, 256L, 512L, 1024L, 2048L)
+
+params_trade <- data.frame(
+  budgets = paste(budgets, collapse = ", "),
+  truth_budget = if (quick) 5000L else 20000L,
+  rollout_policy = "random",
+  seed = 41L
+)
+params_trade
+
+tm <- system.time({
+  trade <- study_budget_tradeoff(
+    board = bg_initial_board(),
+    roll = bg_roll(1L, 6L),
+    method = "thompson",
+    budgets = budgets,
+    truth_budget = if (quick) 5000L else 20000L,
+    rollout_policy = "random",
+    max_rollout_turns = if (quick) 220L else 300L,
+    seed = 41L
+  )
+})
+
+trade[["results"]][, c(
+  "total_budget", "chosen_move_label", "truth_best_move_label",
+  "correct_selection", "simple_regret", "mse", "runtime_seconds"
+)]
+
+data.frame(
+  function_call = "study_budget_tradeoff",
+  elapsed_seconds = fmt_elapsed(tm)
+)
+```
+
+# 8. `study_variance_controls()`
+
+`study_variance_controls()` studies finite-budget sensitivity to simulation
+design controls (dice stratification and CRN). Use it to test robustness.
+
+```{r}
+library(backgammonr)
+
+quick <- isTRUE(getOption("bg_quick_mode", TRUE))
+
+params_var <- data.frame(
+  total_budget = if (quick) 900L else 1800L,
+  dice_modes = "iid, stratified_first_roll",
+  crn_values = "FALSE, TRUE",
+  truth_budget = if (quick) 5000L else 20000L,
+  seed = 51L
+)
+params_var
+
+tm <- system.time({
+  var_study <- study_variance_controls(
+    board = bg_initial_board(),
+    roll = bg_roll(1L, 6L),
+    method = "thompson",
+    total_budget = if (quick) 900L else 1800L,
+    dice_modes = c("iid", "stratified_first_roll"),
+    crn_values = c(FALSE, TRUE),
+    truth_budget = if (quick) 5000L else 20000L,
+    rollout_policy = "random",
+    max_rollout_turns = if (quick) 220L else 300L,
+    seed = 51L
+  )
+})
+
+var_study[["results"]][, c(
+  "dice_mode", "crn", "chosen_move_label",
+  "truth_best_move_label", "correct_selection",
+  "simple_regret", "mse", "runtime_seconds"
+)]
+
+data.frame(
+  function_call = "study_variance_controls",
+  elapsed_seconds = fmt_elapsed(tm)
+)
+```
+
+# 9. `summarize_thompson_benchmark()`
+
+This benchmark summary is the multi-case view. It asks whether Thompson keeps
+an advantage over baselines across cases and budgets, not just in one position.
+
+```{r}
+library(backgammonr)
+
+quick <- isTRUE(getOption("bg_quick_mode", TRUE))
+
+cases <- list(
+  bg_benchmark_case(bg_initial_board(), bg_roll(1L, 6L), case_id = "init_1_6"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(3L, 2L), case_id = "init_3_2"),
+  bg_benchmark_case(bg_initial_board(), bg_roll(5L, 4L), case_id = "init_5_4")
+)
+
+params_bm <- data.frame(
+  n_cases = length(cases),
+  budgets = paste(if (quick) c(256L, 1024L) else c(256L, 1024L, 4096L), collapse = ", "),
+  baselines = "equal, ucb, ocba, greedy",
+  reference_budget = if (quick) 5000L else 20000L,
+  seed = 61L
+)
+params_bm
+
+tm <- system.time({
+  bm <- benchmark_thompson(
+    cases = cases,
+    budgets = if (quick) c(256L, 1024L) else c(256L, 1024L, 4096L),
+    baselines = c("equal", "ucb", "ocba", "greedy"),
+    include_ttts = TRUE,
+    reference_budget = if (quick) 5000L else 20000L,
+    rollout_policy = "random",
+    max_rollout_turns = if (quick) 220L else 300L,
+    seed = 61L
+  )
+
+  focus <- summarize_thompson_benchmark(bm)
+})
+
+focus[["thompson"]][, c(
+  "total_budget", "probability_correct_selection",
+  "mean_simple_regret", "mean_mse", "mean_runtime_seconds",
+  "reference_best_move_label", "most_selected_move_label"
+)]
+
+head(focus[["relative_to_thompson"]], 8L)[, c(
+  "baseline_method", "total_budget",
+  "thompson_advantage_pcs",
+  "thompson_advantage_regret",
+  "thompson_advantage_mse",
+  "thompson_runtime_ratio"
+)]
+
+data.frame(
+  function_call = "summarize_thompson_benchmark",
+  elapsed_seconds = fmt_elapsed(tm)
+)
+```
+
+# 10. Recommended run order
+
+A practical learning/testing sequence:
+
+1. Initialize package and verify version.
+2. Create board and roll (`bg_initial_board()`, `bg_roll()`).
+3. Enumerate actions (`generate_legal_moves()`).
+4. Run finite Thompson (`evaluate_actions_thompson()`).
+5. Build one reusable high-budget reference (`approximate_action_reference()`).
+6. Compare finite vs reference (`compare_thompson_to_reference()`).
+7. Add budget sensitivity (`study_budget_tradeoff()`).
+8. Add variance-control sensitivity (`study_variance_controls()`).
+9. Finish with benchmark summary (`summarize_thompson_benchmark()`).
