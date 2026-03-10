@@ -22,9 +22,11 @@
 
 namespace {
 
-// Build an RNG stream for this call.
-// - If user supplied a seed, run deterministically.
-// - Otherwise seed from std::random_device for non-deterministic behavior.
+// Function: init_rng
+// Purpose: Build the RNG stream used by this translation unit.
+// Called by: bg_cpp_rollout_move_evaluate(), bg_cpp_rollout_move_choice().
+// Notes: Uses deterministic seeding when `use_seed = true`; otherwise uses
+// system entropy so repeated calls are not forced to match.
 std::mt19937 init_rng(const int seed, const bool use_seed) {
   std::mt19937 rng;
 
@@ -45,8 +47,11 @@ std::mt19937 init_rng(const int seed, const bool use_seed) {
 
 namespace backgammonr {
 
-// Returns whether this selection method requires randomness.
-// This is used elsewhere to decide whether we need to allocate/seed an RNG.
+// Function: selection_uses_randomness
+// Purpose: Report whether a selector needs RNG access at runtime.
+// Called by: bg_simulation.cpp and bg_benchmark.cpp helpers that avoid creating
+// RNGs for deterministic selectors.
+// Notes: Validation is done first so bad labels fail fast everywhere.
 bool selection_uses_randomness(const std::string& selection) {
   // Validate first so callers get consistent errors for unsupported labels.
   validate_selection(selection);
@@ -60,8 +65,11 @@ bool selection_uses_randomness(const std::string& selection) {
       selection == "ttts_rollout";
 }
 
-// Validate a user-facing selection label.
-// Keep accepted values synchronized with R-side argument matching.
+// Function: validate_selection
+// Purpose: Enforce the supported selector vocabulary for rollout/game APIs.
+// Called by: selection_uses_randomness(), simulation/benchmark entry points,
+// and R-facing wrappers through shared engine code.
+// Notes: This is the central guardrail for selector spelling.
 void validate_selection(const std::string& selection) {
   if (selection != "first" &&
       selection != "random" &&
@@ -79,19 +87,27 @@ void validate_selection(const std::string& selection) {
   }
 }
 
-// Validate a rollout continuation policy label.
+// Function: is_supported_rollout_policy
+// Purpose: Return whether a rollout continuation policy label is supported.
+// Called by: validate_rollout_config().
 bool is_supported_rollout_policy(const std::string& policy) {
   return policy == "random" || policy == "aggressive" || policy == "defensive";
 }
 
-// Validate dice stratification mode used by allocation/rollout experiments.
+// Function: is_supported_dice_mode
+// Purpose: Return whether a dice variance-control mode is supported.
+// Called by: validate_rollout_config().
 bool is_supported_dice_mode(const std::string& dice_mode) {
   return dice_mode == "iid" ||
       dice_mode == "stratified_first_roll" ||
       dice_mode == "stratified_first_two_rolls";
 }
 
-// Validate complete rollout configuration prior to simulation.
+// Function: validate_rollout_config
+// Purpose: Validate all rollout configuration fields before evaluation.
+// Called by: allocation entry points and benchmark/simulation wrappers that
+// accept rollout controls.
+// Notes: This keeps numeric constraints and label constraints centralized.
 void validate_rollout_config(const RolloutConfig& config) {
   // Budget must allocate at least one rollout.
   if (config.budget < 1) {
@@ -136,19 +152,20 @@ void validate_rollout_config(const RolloutConfig& config) {
   }
 }
 
-// Evaluate each legal move with equal-allocation rollouts and return compact
-// win/loss/unresolved summaries.
+// Function: evaluate_rollout_move_sequences
+// Purpose: Evaluate legal moves using equal allocation and return compact rows.
+// Called by: R-side wrappers for equal-rollout evaluation and tests.
+// Also used conceptually as the non-adaptive baseline against Thompson/UCB/OCBA.
+// Notes: Delegates core sampling to `evaluate_move_sequences_with_allocation()`
+// so all methods share one allocation engine.
 std::vector<RolloutMoveSummary> evaluate_rollout_move_sequences(
     const BoardState& board,
     const std::vector<MoveSequence>& legal_moves,
     const RolloutConfig& config,
     std::mt19937& rng) {
-  // **WHAT IT'S DOING (DETAILED):**
-  // Step 1: call the shared allocation engine with method fixed to `"equal"`.
+  // Step 1: call the shared allocation engine with method fixed to "equal".
   // Step 2: map generic action summaries into rollout-specific summary rows.
-  // Step 3: keep only fields needed for user interpretation in this context.
-  // common evaluator in equal-allocation mode, then present cleaner output."
-  // Reuse the shared allocation engine using canonical method = "equal".
+  // Step 3: return only fields needed by equal-rollout consumers.
   const std::vector<ActionEvaluationSummary> summaries =
       evaluate_move_sequences_with_allocation(board, legal_moves, "equal", config, rng);
 
@@ -175,26 +192,26 @@ std::vector<RolloutMoveSummary> evaluate_rollout_move_sequences(
   return out;
 }
 
-// Choose one move under equal-allocation rollout policy.
+// Function: choose_rollout_move_sequence
+// Purpose: Select one legal move under equal-allocation rollout logic.
+// Called by: R wrappers when user requests one chosen move (not full table).
+// Notes: Uses shared chooser to keep tie-breaking behavior consistent with
+// other allocation methods.
 MoveSequence choose_rollout_move_sequence(
     const BoardState& board,
     const std::vector<MoveSequence>& legal_moves,
     const RolloutConfig& config,
     std::mt19937& rng) {
-  // **WHAT IT'S DOING (DETAILED):** Delegates move choice to the same shared
-  // engine as other methods, but hard-codes equal allocation so behavior is
-  // predictable and directly comparable in benchmarks.
-  // using non-adaptive equal-budget rollout logic.
-  // Again, selection delegates to shared allocation engine with "equal" method.
+  // Hard-code method = "equal" so this function remains the baseline chooser.
   return choose_move_sequence_with_allocation(board, legal_moves, "equal", config, rng);
 }
 
-// Convert rollout summary vector to an R data.frame.
+// Function: rollout_move_summaries_to_data_frame
+// Purpose: Convert C++ rollout summary structs into a columnar R data frame.
+// Called by: internal wrappers that need a compact tabular result.
+// Notes: Isolated here so R column naming/layout stays stable.
 Rcpp::DataFrame rollout_move_summaries_to_data_frame(
     const std::vector<RolloutMoveSummary>& summaries) {
-  // **WHAT IT'S DOING (DETAILED):** Converts vector-of-struct storage (C++) to
-  // columnar vectors (R data frame). This is required because R tables are
-  // column-oriented and downstream plotting/printing expects that layout.
   const int n = static_cast<int>(summaries.size());
   Rcpp::IntegerVector candidate_index(n);
   Rcpp::IntegerVector wins(n);
@@ -222,6 +239,11 @@ Rcpp::DataFrame rollout_move_summaries_to_data_frame(
 }  // namespace backgammonr
 
 // [[Rcpp::export]]
+// Function: bg_cpp_rollout_move_evaluate
+// Purpose: Rcpp entry point for equal-rollout move evaluation.
+// Called by: R function `evaluate_actions_equal_rollout()` via RcppExports.
+// Notes: Returns standardized allocation-style table for compatibility with the
+// package's shared print/summary workflow.
 Rcpp::DataFrame bg_cpp_rollout_move_evaluate(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -230,13 +252,7 @@ Rcpp::DataFrame bg_cpp_rollout_move_evaluate(
     const int max_rollout_turns,
     const int seed,
     const bool use_seed) {
-  // **WHAT IT'S DOING (DETAILED):**
-  // - Parse R inputs into engine-native board/move objects.
-  // - Build rollout configuration from scalar parameters.
-  // - Create deterministic RNG if seed is requested.
-  // - Run equal-allocation evaluation and return standardized action table.
-  // equal rollout allocation."
-  // Parse and validate R-side inputs into C++ engine types.
+  // Parse R-side lists/scalars into engine-native objects.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::MoveSequence> parsed_moves =
       backgammonr::parse_move_sequence_vector(legal_moves);
@@ -244,9 +260,7 @@ Rcpp::DataFrame bg_cpp_rollout_move_evaluate(
   // Build per-call RNG.
   std::mt19937 rng = init_rng(seed, use_seed);
 
-  // Return full allocation-style table so downstream R summaries stay consistent.
-  // We intentionally return the standardized allocation table (not a tiny custom
-  // table) so all methods share the same downstream print/summary code paths.
+  // Return standardized action table so all methods share downstream tooling.
   return backgammonr::action_evaluation_summaries_to_data_frame(
       backgammonr::evaluate_move_sequences_with_allocation(
           parsed_board,
@@ -257,6 +271,10 @@ Rcpp::DataFrame bg_cpp_rollout_move_evaluate(
 }
 
 // [[Rcpp::export]]
+// Function: bg_cpp_rollout_move_choice
+// Purpose: Rcpp entry point for selecting one equal-rollout move.
+// Called by: R function `choose_action_equal_rollout()` via RcppExports.
+// Notes: Mirrors evaluate wrapper parsing/configuration to keep behavior aligned.
 Rcpp::List bg_cpp_rollout_move_choice(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -265,10 +283,7 @@ Rcpp::List bg_cpp_rollout_move_choice(
     const int max_rollout_turns,
     const int seed,
     const bool use_seed) {
-  // **WHAT IT'S DOING (DETAILED):** Same parse/config/RNG steps as the evaluate
-  // wrapper, but returns exactly one selected move sequence instead of a full
-  // per-candidate table.
-  // Parse and validate R-side inputs into C++ engine types.
+  // Parse R-side lists/scalars into engine-native objects.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::MoveSequence> parsed_moves =
       backgammonr::parse_move_sequence_vector(legal_moves);

@@ -24,8 +24,10 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-// Create deterministic/non-deterministic RNG stream.
-// Determinism matters for method-vs-method comparability in benchmarks.
+// Function: init_rng
+// Purpose: Build RNG stream for benchmark wrappers.
+// Called by: all exported benchmark entry points in this file.
+// Notes: Determinism matters for method-vs-method reproducibility.
 std::mt19937 init_rng(const int seed, const bool use_seed) {
   std::mt19937 rng;
 
@@ -42,8 +44,9 @@ std::mt19937 init_rng(const int seed, const bool use_seed) {
   return rng;
 }
 
-// Derive reproducible child RNG streams from case/method labels so each
-// benchmark component can be replayed exactly.
+// Function: stable_stream_seed
+// Purpose: Derive deterministic child stream seeds from case/method labels.
+// Called by: choose_move_for_benchmark().
 std::uint32_t stable_stream_seed(
     const std::uint32_t base_seed,
     const std::string& case_id,
@@ -53,14 +56,19 @@ std::uint32_t stable_stream_seed(
   return static_cast<std::uint32_t>(hashed ^ static_cast<std::size_t>(base_seed));
 }
 
-// Small timing helper used for all benchmark runtime reporting.
+// Function: elapsed_seconds
+// Purpose: Return elapsed wall-clock seconds for benchmark timing.
+// Called by: benchmark_matchup_random(), benchmark_matchup_with_rolls(),
+// benchmark_move_evaluators().
 double elapsed_seconds(
     const std::chrono::time_point<Clock>& start,
     const std::chrono::time_point<Clock>& end) {
   return std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
 }
 
-// Parse R list of scripted rolls into internal DiceRoll objects.
+// Function: parse_roll_vector
+// Purpose: Parse R list of scripted rolls into DiceRoll vector.
+// Called by: bg_cpp_benchmark_matchup_scripted().
 std::vector<backgammonr::DiceRoll> parse_roll_vector(const Rcpp::List& rolls) {
   std::vector<backgammonr::DiceRoll> out;
   out.reserve(rolls.size());
@@ -79,19 +87,25 @@ std::vector<backgammonr::DiceRoll> parse_roll_vector(const Rcpp::List& rolls) {
   return out;
 }
 
-// Convenience check for optional fields in list-like case objects.
+// Function: has_named_element
+// Purpose: Convenience helper for optional case-list fields.
+// Called by: parse_case_id(), parse_move_benchmark_cases().
 bool has_named_element(const Rcpp::List& x, const char* name) {
   return x.containsElementNamed(name);
 }
 
-// Default case IDs are deterministic and human-readable.
+// Function: default_case_id
+// Purpose: Generate deterministic fallback case ID when none is supplied.
+// Called by: parse_case_id().
 std::string default_case_id(const int index) {
   std::ostringstream oss;
   oss << "case_" << index;
   return oss.str();
 }
 
-// Parse optional case ID while enforcing scalar/non-missing semantics.
+// Function: parse_case_id
+// Purpose: Parse optional user-supplied case_id with strict validation.
+// Called by: parse_move_benchmark_cases().
 std::string parse_case_id(const Rcpp::List& case_list, const int index) {
   if (!has_named_element(case_list, "case_id")) {
     return default_case_id(index);
@@ -119,7 +133,9 @@ std::string parse_case_id(const Rcpp::List& case_list, const int index) {
   return parsed;
 }
 
-// Convert chosen move sequence into 1-based index in legal move table.
+// Function: chosen_index_in_legal_moves
+// Purpose: Convert chosen MoveSequence to 1-based index in legal move vector.
+// Called by: benchmark_move_evaluators().
 int chosen_index_in_legal_moves(
     const backgammonr::MoveSequence& chosen,
     const std::vector<backgammonr::MoveSequence>& legal_moves) {
@@ -132,10 +148,10 @@ int chosen_index_in_legal_moves(
   throw std::range_error("Internal error: chosen move was not found in the legal-move set.");
 }
 
-// Method-selection helper used by move-evaluator benchmark.
-// The key behavior is RNG stream isolation:
-// - each case/method/stream_label gets a stable child stream
-// - this avoids accidental cross-method coupling.
+// Function: choose_move_for_benchmark
+// Purpose: Execute one method decision on one benchmark case.
+// Called by: benchmark_move_evaluators().
+// Notes: Uses case/method-specific child RNG to avoid cross-method coupling.
 std::optional<backgammonr::MoveSequence> choose_move_for_benchmark(
     const backgammonr::BoardState& board,
     const std::vector<backgammonr::MoveSequence>& legal_moves,
@@ -158,7 +174,9 @@ std::optional<backgammonr::MoveSequence> choose_move_for_benchmark(
   return backgammonr::choose_move_sequence(board, legal_moves, method, rng_ptr, rollout_config);
 }
 
-// Attach runtime-derived throughput columns to summary data frame.
+// Function: add_runtime_columns_to_summary
+// Purpose: Append runtime/throughput columns to matchup summary table.
+// Called by: matchup_benchmark_result_to_list().
 Rcpp::DataFrame add_runtime_columns_to_summary(const Rcpp::DataFrame& summary, const double runtime_seconds, const int n_games) {
   Rcpp::List out(summary);
   out.push_back(Rcpp::NumericVector::create(runtime_seconds), "runtime_seconds");
@@ -177,7 +195,9 @@ Rcpp::DataFrame add_runtime_columns_to_summary(const Rcpp::DataFrame& summary, c
 
 namespace backgammonr {
 
-// Benchmark random-roll matchup end-to-end and keep wall-clock runtime.
+// Function: benchmark_matchup_random
+// Purpose: Time and run random-dice matchup simulation.
+// Called by: bg_cpp_benchmark_matchup_random().
 MatchupBenchmarkResult benchmark_matchup_random(
     const BoardState& initial_board,
     const int n_games,
@@ -203,7 +223,9 @@ MatchupBenchmarkResult benchmark_matchup_random(
   return out;
 }
 
-// Benchmark scripted-roll matchup end-to-end and keep wall-clock runtime.
+// Function: benchmark_matchup_with_rolls
+// Purpose: Time and run scripted-dice matchup simulation.
+// Called by: bg_cpp_benchmark_matchup_scripted().
 MatchupBenchmarkResult benchmark_matchup_with_rolls(
     const BoardState& initial_board,
     const std::vector<DiceRoll>& rolls,
@@ -231,8 +253,9 @@ MatchupBenchmarkResult benchmark_matchup_with_rolls(
   return out;
 }
 
-// Parse list of benchmark cases:
-// each case must provide (board, roll), and may provide case_id.
+// Function: parse_move_benchmark_cases
+// Purpose: Parse and validate benchmark case list from R.
+// Called by: bg_cpp_benchmark_move_evaluators().
 std::vector<MoveBenchmarkCase> parse_move_benchmark_cases(const Rcpp::List& cases) {
   std::vector<MoveBenchmarkCase> out;
   out.reserve(cases.size());
@@ -272,9 +295,11 @@ std::vector<MoveBenchmarkCase> parse_move_benchmark_cases(const Rcpp::List& case
   return out;
 }
 
-// Core move-evaluator benchmark:
-// for each case and each method, choose one move and compare to optional
-// reference method choice on the same legal-action set.
+// Function: benchmark_move_evaluators
+// Purpose: Core move-choice benchmark across cases and methods.
+// Called by: bg_cpp_benchmark_move_evaluators().
+// Notes: Optional reference method is evaluated once per case and reused across
+// method rows to keep agreement comparisons fair.
 MoveBenchmarkResult benchmark_move_evaluators(
     const std::vector<MoveBenchmarkCase>& cases,
     const std::vector<std::string>& methods,
@@ -282,12 +307,6 @@ MoveBenchmarkResult benchmark_move_evaluators(
     const RolloutConfig& method_rollout_config,
     const RolloutConfig& reference_rollout_config,
     std::mt19937& rng) {
-  // **WHAT IT'S DOING (DETAILED):** Runs a controlled cross-method benchmark
-  // over a shared set of decision cases.
-  // Key design choice: if `reference_method` is provided, we compute its choice
-  // once per case (not once per method row) and compare each tested method to
-  // that fixed reference choice.
-  // the answer key is generated once per question so the comparison is fair.
   validate_rollout_config(method_rollout_config);
   validate_rollout_config(reference_rollout_config);
 
@@ -390,7 +409,10 @@ MoveBenchmarkResult benchmark_move_evaluators(
   return out;
 }
 
-// Convert matchup benchmark object to R list and append runtime metadata.
+// Function: matchup_benchmark_result_to_list
+// Purpose: Convert matchup benchmark result to R list and append runtime fields.
+// Called by: bg_cpp_benchmark_matchup_random(),
+// bg_cpp_benchmark_matchup_scripted().
 Rcpp::List matchup_benchmark_result_to_list(const MatchupBenchmarkResult& result) {
   Rcpp::List out = matchup_simulation_result_to_list(result.simulation);
   const Rcpp::DataFrame summary(out["summary"]);
@@ -402,7 +424,9 @@ Rcpp::List matchup_benchmark_result_to_list(const MatchupBenchmarkResult& result
   return out;
 }
 
-// Convert row-level move benchmark records to R data frame.
+// Function: move_benchmark_rows_to_data_frame
+// Purpose: Convert row-level move benchmark records to R data frame.
+// Called by: move_benchmark_result_to_list().
 Rcpp::DataFrame move_benchmark_rows_to_data_frame(const MoveBenchmarkResult& result) {
   const int n = static_cast<int>(result.rows.size());
   Rcpp::CharacterVector case_id(n);
@@ -434,7 +458,11 @@ Rcpp::DataFrame move_benchmark_rows_to_data_frame(const MoveBenchmarkResult& res
       Rcpp::_["stringsAsFactors"] = false);
 }
 
-// Aggregate move benchmark rows by method into compact summary metrics.
+// Function: move_benchmark_summary_to_data_frame
+// Purpose: Aggregate move benchmark rows by method into summary metrics.
+// Called by: move_benchmark_result_to_list().
+// Notes: Inner loop intentionally scans all rows to produce method-level
+// totals, runtimes, and reference-agreement rates.
 Rcpp::DataFrame move_benchmark_summary_to_data_frame(const MoveBenchmarkResult& result) {
   const int n_methods = static_cast<int>(result.methods.size());
   Rcpp::CharacterVector method(n_methods);
@@ -494,7 +522,9 @@ Rcpp::DataFrame move_benchmark_summary_to_data_frame(const MoveBenchmarkResult& 
       Rcpp::_["stringsAsFactors"] = false);
 }
 
-// Package row-level + summary-level benchmark outputs into one R list.
+// Function: move_benchmark_result_to_list
+// Purpose: Bundle row-level and summary-level move benchmark outputs for R.
+// Called by: bg_cpp_benchmark_move_evaluators().
 Rcpp::List move_benchmark_result_to_list(
     const MoveBenchmarkResult& result,
     const RolloutConfig& method_rollout_config,
@@ -518,6 +548,9 @@ Rcpp::List move_benchmark_result_to_list(
 }  // namespace backgammonr
 
 // [[Rcpp::export]]
+// Function: bg_cpp_benchmark_matchup_random
+// Purpose: Rcpp entry point for random-dice matchup benchmarking.
+// Called by: R benchmark wrapper in R/benchmarking.R.
 Rcpp::List bg_cpp_benchmark_matchup_random(
     const Rcpp::List& board,
     const int n_games,
@@ -546,6 +579,9 @@ Rcpp::List bg_cpp_benchmark_matchup_random(
 }
 
 // [[Rcpp::export]]
+// Function: bg_cpp_benchmark_matchup_scripted
+// Purpose: Rcpp entry point for scripted-dice matchup benchmarking.
+// Called by: R benchmark wrapper in R/benchmarking.R.
 Rcpp::List bg_cpp_benchmark_matchup_scripted(
     const Rcpp::List& board,
     const Rcpp::List& rolls,
@@ -585,6 +621,9 @@ Rcpp::List bg_cpp_benchmark_matchup_scripted(
 }
 
 // [[Rcpp::export]]
+// Function: bg_cpp_benchmark_move_evaluators
+// Purpose: Rcpp entry point for case-by-case move benchmark across methods.
+// Called by: benchmark_move_evaluators() R wrapper in R/benchmarking.R.
 Rcpp::List bg_cpp_benchmark_move_evaluators(
     const Rcpp::List& cases,
     const std::vector<std::string>& methods,

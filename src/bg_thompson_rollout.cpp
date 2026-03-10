@@ -21,9 +21,11 @@
 
 namespace {
 
-// Construct RNG for this call.
-// - Deterministic when a seed is provided.
-// - Otherwise seeded from entropy source.
+// Function: init_rng
+// Purpose: Build per-call RNG stream for Thompson rollout wrappers.
+// Called by: bg_cpp_thompson_rollout_move_evaluate(),
+// bg_cpp_thompson_rollout_move_choice().
+// Notes: Keeps deterministic behavior when seed is supplied.
 std::mt19937 init_rng(const int seed, const bool use_seed) {
   std::mt19937 rng;
 
@@ -44,18 +46,18 @@ std::mt19937 init_rng(const int seed, const bool use_seed) {
 
 namespace backgammonr {
 
-// Evaluate legal moves with Thompson allocation and return a Thompson-focused
-// compact structure.
+// Function: evaluate_thompson_rollout_move_sequences
+// Purpose: Evaluate legal moves with Thompson allocation and return compact
+// Thompson-focused summaries.
+// Called by: Thompson-specific R wrappers and unit tests.
+// Notes: Delegates to shared allocation engine to avoid duplicated logic.
 std::vector<ThompsonRolloutMoveSummary> evaluate_thompson_rollout_move_sequences(
     const BoardState& board,
     const std::vector<MoveSequence>& legal_moves,
     const RolloutConfig& config,
     std::mt19937& rng) {
-  // **WHAT IT'S DOING (DETAILED):**
-  // 1) Call the shared allocation engine with method fixed to Thompson sampling.
-  // 2) Receive generic action summaries (shared across all allocation methods).
-  // 3) Project those fields into a Thompson-specific compact summary struct.
-  // Shared engine call with canonical method label = "thompson".
+  // Step 1: run shared allocator with method fixed to "thompson".
+  // Step 2: map generic summaries into a Thompson-specific result struct.
   const std::vector<ActionEvaluationSummary> summaries =
       evaluate_move_sequences_with_allocation(board, legal_moves, "thompson", config, rng);
 
@@ -87,23 +89,25 @@ std::vector<ThompsonRolloutMoveSummary> evaluate_thompson_rollout_move_sequences
   return out;
 }
 
-// Choose a single move with Thompson allocation.
+// Function: choose_thompson_rollout_move_sequence
+// Purpose: Choose one legal move under Thompson allocation.
+// Called by: Thompson R choice wrapper and benchmark paths.
+// Notes: Shares tie-breaking and posterior logic with generic allocator.
 MoveSequence choose_thompson_rollout_move_sequence(
     const BoardState& board,
     const std::vector<MoveSequence>& legal_moves,
     const RolloutConfig& config,
     std::mt19937& rng) {
-  // **WHAT IT'S DOING (DETAILED):** Delegates to the shared chooser while
-  // pinning method = `"thompson"`.
+  // Hard-code method = "thompson" and defer core selection to shared chooser.
   return choose_move_sequence_with_allocation(board, legal_moves, "thompson", config, rng);
 }
 
-// Convert Thompson summaries to an R data.frame.
+// Function: thompson_rollout_move_summaries_to_data_frame
+// Purpose: Convert Thompson summary structs into a stable R data-frame schema.
+// Called by: Thompson evaluate wrappers and R-facing output helpers.
+// Notes: Keeps column names and ordering stable for docs/examples/tests.
 Rcpp::DataFrame thompson_rollout_move_summaries_to_data_frame(
     const std::vector<ThompsonRolloutMoveSummary>& summaries) {
-  // **WHAT IT'S DOING (DETAILED):** Marshals C++ Thompson summary rows into an
-  // R data frame with explicit columns for allocation counts, outcomes, and
-  // posterior parameters.
   const int n = static_cast<int>(summaries.size());
   Rcpp::IntegerVector candidate_index(n);
   Rcpp::IntegerVector allocation_count(n);
@@ -143,6 +147,10 @@ Rcpp::DataFrame thompson_rollout_move_summaries_to_data_frame(
 }  // namespace backgammonr
 
 // [[Rcpp::export]]
+// Function: bg_cpp_thompson_rollout_move_evaluate
+// Purpose: Rcpp entry point for Thompson move evaluation (table output).
+// Called by: R function `evaluate_actions_thompson()` through RcppExports.
+// Notes: Returns standardized action-evaluation table used across methods.
 Rcpp::DataFrame bg_cpp_thompson_rollout_move_evaluate(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -151,13 +159,7 @@ Rcpp::DataFrame bg_cpp_thompson_rollout_move_evaluate(
     const int max_rollout_turns,
     const int seed,
     const bool use_seed) {
-  // **WHAT IT'S DOING (DETAILED):**
-  // - Parse R board/move lists into engine objects.
-  // - Build rollout config.
-  // - Initialize RNG stream (seeded or random-device).
-  // - Run Thompson allocation evaluator.
-  // - Return standardized action-evaluation table.
-  // Parse R objects into C++ engine structures.
+  // Parse R lists/scalars into C++ engine structures.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::MoveSequence> parsed_moves =
       backgammonr::parse_move_sequence_vector(legal_moves);
@@ -177,6 +179,10 @@ Rcpp::DataFrame bg_cpp_thompson_rollout_move_evaluate(
 }
 
 // [[Rcpp::export]]
+// Function: bg_cpp_thompson_rollout_move_choice
+// Purpose: Rcpp entry point for one Thompson-selected move.
+// Called by: R function `choose_action_thompson()` through RcppExports.
+// Notes: Uses same parsing/config pattern as evaluate wrapper for consistency.
 Rcpp::List bg_cpp_thompson_rollout_move_choice(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -185,9 +191,7 @@ Rcpp::List bg_cpp_thompson_rollout_move_choice(
     const int max_rollout_turns,
     const int seed,
     const bool use_seed) {
-  // **WHAT IT'S DOING (DETAILED):** Same parsing/config/RNG setup as the
-  // evaluate wrapper, but returns only the selected move sequence.
-  // Parse R objects into C++ engine structures.
+  // Parse R lists/scalars into C++ engine structures.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::MoveSequence> parsed_moves =
       backgammonr::parse_move_sequence_vector(legal_moves);

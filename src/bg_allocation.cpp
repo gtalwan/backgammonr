@@ -102,6 +102,10 @@ RolloutOutcome outcome_from_turn_result(
 backgammonr::BoardState apply_sequence_without_full_validation(
     const backgammonr::BoardState& board,
     const backgammonr::MoveSequence& sequence) {
+  // Function: apply_sequence_without_full_validation
+  // Purpose: Apply a move sequence quickly without re-validating every step.
+  // Called by: collapse_equivalent_candidates(), runtime profiling helper.
+  // Notes: Safe here because callers pass legal move sequences from generator.
   // Copy once, then apply sequence steps without re-validating each step.
   backgammonr::BoardState out = board;
 
@@ -117,10 +121,17 @@ void play_random_turn_lightweight(
     backgammonr::BoardState& board,
     const backgammonr::DiceRoll& roll,
     std::mt19937& rng) {
+  // Function: play_random_turn_lightweight
+  // Purpose: Fast random-turn execution path used inside rollout loops.
+  // Called by: single_rollout_outcome() random-policy branch.
   (void) backgammonr::play_random_turn_rollout_fast(board, roll, rng);
 }
 
 std::mt19937 init_rng(const int seed, const bool use_seed) {
+  // Function: init_rng
+  // Purpose: Build per-call RNG stream for allocation exports.
+  // Called by: bg_cpp_allocation_evaluate(), bg_cpp_allocation_evaluate_trace(),
+  // bg_cpp_profile_rollout_runtime().
   std::mt19937 rng;
 
   if (use_seed) {
@@ -137,6 +148,9 @@ std::mt19937 init_rng(const int seed, const bool use_seed) {
 }
 
 double outcome_reward(const RolloutOutcome outcome, const backgammonr::RolloutConfig& config) {
+  // Function: outcome_reward
+  // Purpose: Map rollout outcomes into reward-scale values in [0, 1].
+  // Called by: update_summary().
   // Map terminal outcome to Bernoulli-style reward with unresolved fallback.
   if (outcome == RolloutOutcome::kWin) {
     return 1.0;
@@ -155,6 +169,10 @@ RolloutOutcome single_rollout_outcome(
     const backgammonr::RolloutConfig& config,
     std::mt19937& rng,
     const ForcedRollSchedule& forced_rolls) {
+  // Function: single_rollout_outcome
+  // Purpose: Run one continuation rollout and return win/loss/unresolved.
+  // Called by: evaluate_with_optional_trace() in warm-start and main loop.
+  // Notes: Handles random-policy fast path and non-random policy path.
   // Candidate already ends game.
   if (backgammonr::board_is_terminal(board_after)) {
     return backgammonr::board_winner(board_after) == acting_player
@@ -240,6 +258,9 @@ void update_summary(
     backgammonr::ActionEvaluationSummary& summary,
     const RolloutOutcome outcome,
     const backgammonr::RolloutConfig& config) {
+  // Function: update_summary
+  // Purpose: Update counts and Beta posterior stats after one rollout result.
+  // Called by: evaluate_with_optional_trace().
   // Track raw outcome counts.
   summary.allocation_count += 1;
 
@@ -258,6 +279,9 @@ void update_summary(
 }
 
 double sample_beta_distribution(const double alpha, const double beta, std::mt19937& rng) {
+  // Function: sample_beta_distribution
+  // Purpose: Draw one sample from Beta(alpha, beta) using Gamma ratio.
+  // Called by: compute_posterior_diagnostics(), choose_next_candidate().
   if (alpha <= 0.0 || beta <= 0.0) {
     throw std::range_error("Beta posterior parameters must be positive.");
   }
@@ -275,6 +299,9 @@ double sample_beta_distribution(const double alpha, const double beta, std::mt19
 }
 
 AllocationPolicy parse_allocation_policy(const std::string& canonical_method) {
+  // Function: parse_allocation_policy
+  // Purpose: Convert canonical method label to internal enum switch value.
+  // Called by: evaluate_with_optional_trace().
   // Map canonical method string to internal switch enum.
   if (canonical_method == "equal") {
     return AllocationPolicy::kEqual;
@@ -303,6 +330,9 @@ bool score_beats_incumbent(
     const int allocation_count,
     const double incumbent_score,
     const int incumbent_allocation_count) {
+  // Function: score_beats_incumbent
+  // Purpose: Compare candidate score against current best with tie-breaking.
+  // Called by: choose_next_candidate().
   // Primary criterion: larger score.
   if (score > incumbent_score + kTieTolerance) {
     return true;
@@ -321,6 +351,9 @@ std::uint32_t stable_rollout_seed(
     const std::uint32_t base_seed,
     const int sample_index,
     const int salt) {
+  // Function: stable_rollout_seed
+  // Purpose: Deterministically derive per-sample RNG seeds for CRN mode.
+  // Called by: evaluate_with_optional_trace().
   // Mix sample index and salt into a stable 32-bit seed.
   std::uint32_t x = base_seed ^ static_cast<std::uint32_t>(sample_index * 0x9e3779b9U);
   x ^= static_cast<std::uint32_t>(salt * 0x7f4a7c15U);
@@ -333,6 +366,9 @@ std::uint32_t stable_rollout_seed(
 }
 
 const std::vector<backgammonr::DiceRoll>& unique_unordered_rolls() {
+  // Function: unique_unordered_rolls
+  // Purpose: Return cached 21 unordered dice outcomes.
+  // Called by: scheduled_forced_rolls().
   // Lazily initialize 21 unordered roll outcomes (1-1, 1-2, ..., 6-6).
   static const std::vector<backgammonr::DiceRoll> outcomes = []() {
     std::vector<backgammonr::DiceRoll> out;
@@ -351,6 +387,9 @@ ForcedRollSchedule scheduled_forced_rolls(
     const std::string& dice_mode,
     const int sample_index,
     const int offset) {
+  // Function: scheduled_forced_rolls
+  // Purpose: Build deterministic forced-roll prefix for stratified dice modes.
+  // Called by: evaluate_with_optional_trace().
   ForcedRollSchedule schedule;
 
   if (dice_mode == "iid") {
@@ -387,6 +426,9 @@ ForcedRollSchedule scheduled_forced_rolls(
 RolloutOutcome outcome_from_turn_result(
     const backgammonr::TurnResult& turn_result,
     const int acting_player) {
+  // Function: outcome_from_turn_result
+  // Purpose: Convert TurnResult terminal state into rollout outcome enum.
+  // Called by: single_rollout_outcome() non-random branch.
   if (!turn_result.game_over) {
     return RolloutOutcome::kUnresolved;
   }
@@ -427,6 +469,9 @@ struct BoardStateKeyHash {
 };
 
 BoardStateKey board_state_key(const backgammonr::BoardState& board) {
+  // Function: board_state_key
+  // Purpose: Convert board state into hashable key for deduplication.
+  // Called by: collapse_equivalent_candidates().
   // Copy board fields into fixed key struct for unordered_map lookup.
   BoardStateKey key;
   key.points = board.points;
@@ -439,12 +484,10 @@ BoardStateKey board_state_key(const backgammonr::BoardState& board) {
 std::vector<CollapsedCandidate> collapse_equivalent_candidates(
     const backgammonr::BoardState& board,
     const std::vector<backgammonr::MoveSequence>& legal_moves) {
-  // **WHAT IT'S DOING (DETAILED):** We canonicalize the action set by merging
-  // different legal move sequences that end in the same resulting board state.
-  // This avoids spending duplicate rollout budget on strategically identical
-  // outcomes.
-  // them as one option so simulation time is not wasted repeating equivalent work.
-  // Collapse moves that lead to identical board states.
+  // Function: collapse_equivalent_candidates
+  // Purpose: Merge legal sequences that lead to identical post-move boards.
+  // Called by: evaluate_with_optional_trace().
+  // Notes: Prevents wasting rollout budget on duplicate strategic outcomes.
   std::vector<CollapsedCandidate> collapsed;
   collapsed.reserve(legal_moves.size());
   std::unordered_map<BoardStateKey, int, BoardStateKeyHash> key_to_collapsed_index;
@@ -478,13 +521,9 @@ std::vector<CollapsedCandidate> collapse_equivalent_candidates(
 void compute_posterior_diagnostics(
     std::vector<backgammonr::ActionEvaluationSummary>& summaries,
     std::mt19937& rng) {
-  // **WHAT IT'S DOING (DETAILED):** Approximates two Bayesian diagnostics from
-  // posterior draws:
-  // 1) `prob_best`: how often each candidate wins a posterior draw tournament.
-  // 2) `posterior_expected_regret`: average gap to the sampled best value.
-  // current uncertainty, then count how often each move looks best and how much
-  // value is lost if we picked a non-best move in those hypothetical worlds.
-  // Monte Carlo posterior diagnostics (probability best + expected regret).
+  // Function: compute_posterior_diagnostics
+  // Purpose: Monte Carlo posterior diagnostics (prob_best and expected regret).
+  // Called by: finalize_summaries() when fast_diagnostics = false.
   const int n = static_cast<int>(summaries.size());
   if (n == 0 || kPosteriorDiagnosticDraws <= 0) {
     return;
@@ -527,6 +566,9 @@ void finalize_summaries(
     const AllocationPolicy policy,
     const backgammonr::RolloutConfig& config,
     std::mt19937& rng) {
+  // Function: finalize_summaries
+  // Purpose: Finalize estimates, uncertainty intervals, and diagnostic fields.
+  // Called by: evaluate_with_optional_trace() at end of budget loop.
   // Convert integer counts and Beta parameters into vectorized Armadillo arrays.
   const int n = static_cast<int>(summaries.size());
   arma::vec counts(n);
@@ -597,6 +639,9 @@ void update_interim_summary_fields(
     const AllocationPolicy policy,
     const backgammonr::RolloutConfig& config,
     const int total_allocations) {
+  // Function: update_interim_summary_fields
+  // Purpose: Cheap partial summary update used for trace checkpoints.
+  // Called by: append_trace_snapshot().
   // Cheaper variant used for trace snapshots during allocation loop.
   const int n = static_cast<int>(summaries.size());
   if (n == 0) {
@@ -653,6 +698,9 @@ void update_interim_summary_fields(
 }
 
 int current_leader_index(const std::vector<backgammonr::ActionEvaluationSummary>& summaries) {
+  // Function: current_leader_index
+  // Purpose: Identify current leader for trace reporting.
+  // Called by: append_trace_snapshot().
   // Pick current leader by estimate, tie-break by higher sample count.
   if (summaries.empty()) {
     return NA_INTEGER;
@@ -681,6 +729,9 @@ void append_trace_snapshot(
     const backgammonr::RolloutConfig& config,
     const int checkpoint,
     const int selected_candidate) {
+  // Function: append_trace_snapshot
+  // Purpose: Emit one checkpoint block (one row per candidate) into trace table.
+  // Called by: evaluate_with_optional_trace() via maybe_trace lambda.
   // Refresh per-candidate fields as of this checkpoint.
   update_interim_summary_fields(summaries, policy, config, checkpoint);
   const int leader_pos = current_leader_index(summaries);
@@ -714,12 +765,10 @@ void append_trace_snapshot(
 arma::vec ocba_target_allocations(
     const std::vector<backgammonr::ActionEvaluationSummary>& summaries,
     const int next_total_allocations) {
-  // **WHAT IT'S DOING (DETAILED):** Computes a continuous OCBA-inspired target
-  // allocation profile from posterior means and posterior standard deviations.
-  // Arms with smaller mean gaps and/or larger uncertainty get larger target mass.
-  // and still uncertain, because those are the ones that can still change the
-  // final recommendation.
-  // OCBA target-allocation approximation from posterior means/variances.
+  // Function: ocba_target_allocations
+  // Purpose: Compute OCBA-inspired target allocation vector for next budget step.
+  // Called by: choose_next_candidate() when policy = kOcba.
+  // Notes: Uses posterior means/variances and gap-based ratios.
   const int n = static_cast<int>(summaries.size());
   arma::vec target(n, arma::fill::zeros);
   if (n == 0) {
@@ -787,12 +836,10 @@ int choose_next_candidate(
     const int step,
     const backgammonr::RolloutConfig& config,
     std::mt19937& rng) {
-  // **WHAT IT'S DOING (DETAILED):** Central policy switch for one-step budget
-  // allocation. Given the current posterior state, this chooses exactly one
-  // candidate to receive the next rollout sample.
-  // Different methods answer that question differently (equal, UCB, Thompson,
-  // TTTS, OCBA), but they all pass through this function.
-  // Policy-specific next-arm selection in a fixed-budget simulation problem.
+  // Function: choose_next_candidate
+  // Purpose: Choose which candidate receives the next rollout sample.
+  // Called by: evaluate_with_optional_trace() main loop.
+  // Notes: Central policy switch for equal/greedy/UCB/Thompson/TTTS/OCBA.
   const int n = static_cast<int>(summaries.size());
 
   if (policy == AllocationPolicy::kEqual) {
@@ -831,10 +878,6 @@ int choose_next_candidate(
   }
 
   if (policy == AllocationPolicy::kTtts) {
-    // **WHAT IT'S DOING (DETAILED):** Top-Two Thompson Sampling (TTTS):
-    // sample a first winner I, then with probability beta play I, otherwise
-    // sample until we get a distinct winner J and play J.
-    // under posterior uncertainty so we do not over-commit too early.
     // Top-Two Thompson Sampling:
     // 1) draw posterior sample and pick top action I,
     // 2) with probability beta play I,
@@ -922,15 +965,14 @@ std::vector<backgammonr::ActionEvaluationSummary> evaluate_with_optional_trace(
     std::mt19937& rng,
     const int trace_every,
     std::vector<AllocationTraceRow>* trace_rows) {
-  // **WHAT IT'S DOING (DETAILED):** End-to-end fixed-budget evaluator with
-  // optional trace logging.
-  // Phase A: validate config and canonicalize method.
-  // Phase B: collapse equivalent actions and initialize posterior summaries.
-  // Phase C: optional warm-start allocations for adaptive methods.
-  // Phase D: main adaptive allocation loop until budget is exhausted.
-  // Phase E: finalize posterior summaries/diagnostics and return.
-  // limited simulation budget and records how estimates and uncertainty evolve.
-  // Core allocation engine used by all public wrappers.
+  // Function: evaluate_with_optional_trace
+  // Purpose: Core fixed-budget allocation engine with optional trace output.
+  // Called by: evaluate_move_sequences_with_allocation(),
+  // bg_cpp_allocation_evaluate_trace().
+  // Notes:
+  // - Canonicalizes method and validates config.
+  // - Runs warm-start + adaptive budget loop.
+  // - Finalizes posterior summaries and optional diagnostics.
   backgammonr::validate_rollout_config(config);
   if (trace_rows != nullptr && trace_every < 1) {
     throw std::range_error("`trace_every` must be at least 1.");
@@ -1055,6 +1097,9 @@ namespace backgammonr {
 
 // Supported public method identifiers (including compatibility aliases).
 bool is_supported_allocation_method(const std::string& method) {
+  // Function: is_supported_allocation_method
+  // Purpose: Return whether a method label is recognized by allocation engine.
+  // Called by: validate_allocation_method().
   return method == "equal" ||
       method == "greedy" ||
       method == "ucb" ||
@@ -1071,6 +1116,9 @@ bool is_supported_allocation_method(const std::string& method) {
 }
 
 void validate_allocation_method(const std::string& method) {
+  // Function: validate_allocation_method
+  // Purpose: Enforce supported allocation method vocabulary.
+  // Called by: canonicalize_allocation_method() and R-facing wrappers.
   if (!is_supported_allocation_method(method)) {
     throw std::range_error(
         "`method` must be one of \"equal\", \"greedy\", \"ucb\", \"ocba\", \"thompson\", \"ttts\", \"rollout\", \"equal_rollout\", \"greedy_rollout\", \"ucb_rollout\", \"ocba_rollout\", \"thompson_rollout\", or \"ttts_rollout\".");
@@ -1078,6 +1126,9 @@ void validate_allocation_method(const std::string& method) {
 }
 
 std::string canonicalize_allocation_method(const std::string& method) {
+  // Function: canonicalize_allocation_method
+  // Purpose: Map aliases to canonical method IDs used internally.
+  // Called by: evaluate_with_optional_trace(), R wrappers for reporting.
   // Canonicalize aliases so downstream switches only handle one spelling.
   validate_allocation_method(method);
 
@@ -1108,7 +1159,10 @@ std::vector<ActionEvaluationSummary> evaluate_move_sequences_with_allocation(
     const std::string& method,
     const RolloutConfig& config,
     std::mt19937& rng) {
-  // Public entry: evaluate without trace.
+  // Function: evaluate_move_sequences_with_allocation
+  // Purpose: Public evaluation entry point (no trace output).
+  // Called by: rollout/thompson wrappers, benchmark code, game engine rollout
+  // selectors, profiling helper.
   return evaluate_with_optional_trace(
       board,
       legal_moves,
@@ -1120,6 +1174,9 @@ std::vector<ActionEvaluationSummary> evaluate_move_sequences_with_allocation(
 }
 
 int best_candidate_index(const std::vector<ActionEvaluationSummary>& summaries) {
+  // Function: best_candidate_index
+  // Purpose: Deterministically choose best summary row from evaluated actions.
+  // Called by: choose_move_sequence_with_allocation(), bg_cpp_allocation exports.
   // Pick best by posterior estimate, with deterministic tie-breaks.
   if (summaries.empty()) {
     throw std::range_error("Cannot determine a best candidate from an empty summary set.");
@@ -1161,6 +1218,10 @@ MoveSequence choose_move_sequence_with_allocation(
     const std::string& method,
     const RolloutConfig& config,
     std::mt19937& rng) {
+  // Function: choose_move_sequence_with_allocation
+  // Purpose: Public move-choice entry point for allocation-based selectors.
+  // Called by: game engine selection path (bg_game.cpp), rollout wrappers,
+  // thompson wrappers, benchmark helper.
   if (legal_moves.empty()) {
     throw std::range_error("Cannot choose from an empty legal-move set.");
   }
@@ -1184,6 +1245,9 @@ MoveSequence choose_move_sequence_with_allocation(
 
 Rcpp::DataFrame action_evaluation_summaries_to_data_frame(
     const std::vector<ActionEvaluationSummary>& summaries) {
+  // Function: action_evaluation_summaries_to_data_frame
+  // Purpose: Convert action summary structs into standardized R data frame.
+  // Called by: bg_cpp_allocation_evaluate(), rollout/thompson Rcpp wrappers.
   // Columnar conversion for R-side data-frame consumption.
   const int n = static_cast<int>(summaries.size());
   Rcpp::IntegerVector candidate_index(n);
@@ -1246,6 +1310,9 @@ Rcpp::DataFrame action_evaluation_summaries_to_data_frame(
 
 Rcpp::DataFrame allocation_trace_rows_to_data_frame(
     const std::vector<AllocationTraceRow>& trace_rows) {
+  // Function: allocation_trace_rows_to_data_frame
+  // Purpose: Convert allocation trace rows into R data frame.
+  // Called by: bg_cpp_allocation_evaluate_trace().
   // Columnar conversion for optional trace output.
   const int n = static_cast<int>(trace_rows.size());
   Rcpp::IntegerVector checkpoint(n);
@@ -1305,6 +1372,9 @@ Rcpp::DataFrame allocation_trace_rows_to_data_frame(
 }
 
 // [[Rcpp::export]]
+// Function: bg_cpp_allocation_evaluate
+// Purpose: Rcpp entry point for allocation-method evaluation table.
+// Called by: R wrapper `bg_cpp_allocation_evaluate` via RcppExports.
 Rcpp::List bg_cpp_allocation_evaluate(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -1362,6 +1432,9 @@ Rcpp::List bg_cpp_allocation_evaluate(
 }
 
 // [[Rcpp::export]]
+// Function: bg_cpp_allocation_evaluate_trace
+// Purpose: Rcpp entry point for allocation evaluation with trace checkpoints.
+// Called by: R wrapper `bg_cpp_allocation_evaluate_trace` via RcppExports.
 Rcpp::List bg_cpp_allocation_evaluate_trace(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -1426,6 +1499,10 @@ Rcpp::List bg_cpp_allocation_evaluate_trace(
 }
 
 // [[Rcpp::export]]
+// Function: bg_cpp_profile_rollout_runtime
+// Purpose: Micro-profile legal-move generation, move application, and rollout
+// phases for runtime diagnostics.
+// Called by: R profiling helper wrappers.
 Rcpp::List bg_cpp_profile_rollout_runtime(
     const Rcpp::List& board,
     const Rcpp::List& roll,

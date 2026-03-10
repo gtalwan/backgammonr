@@ -16,27 +16,35 @@
 
 namespace {
 
-// Reuse the engine's randomness predicate so scripted simulation can decide
-// whether it needs an RNG at all.
+// Function: selection_uses_randomness
+// Purpose: Proxy to shared selector randomness check in rollout module.
+// Called by: bg_cpp_simulate_matchup_scripted() to skip RNG setup when both
+// policies are deterministic.
 bool selection_uses_randomness(const std::string& selection) {
   return backgammonr::selection_uses_randomness(selection);
 }
 
-// Validate number of games argument.
+// Function: validate_n_games
+// Purpose: Validate simulation replication count.
+// Called by: simulate_matchup_random(), simulate_matchup_with_rolls().
 void validate_n_games(const int n_games) {
   if (n_games < 1) {
     throw std::range_error("`n_games` must be at least 1.");
   }
 }
 
-// Validate per-game turn cap.
+// Function: validate_max_turns
+// Purpose: Validate per-game turn cap.
+// Called by: simulate_matchup_random(), simulate_matchup_with_rolls().
 void validate_max_turns(const int max_turns) {
   if (max_turns < 0) {
     throw std::range_error("`max_turns` must be nonnegative.");
   }
 }
 
-// Build deterministic or nondeterministic RNG depending on user arguments.
+// Function: init_rng
+// Purpose: Build RNG stream for simulation wrappers.
+// Called by: all exported simulation functions in this file.
 std::mt19937 init_rng(const int seed, const bool use_seed) {
   std::mt19937 rng;
 
@@ -53,7 +61,9 @@ std::mt19937 init_rng(const int seed, const bool use_seed) {
   return rng;
 }
 
-// Parse list of scripted rolls from R into engine roll objects.
+// Function: parse_roll_vector
+// Purpose: Parse R list of roll objects into C++ DiceRoll vector.
+// Called by: scripted simulation wrappers (with/without rollout config).
 std::vector<backgammonr::DiceRoll> parse_roll_vector(const Rcpp::List& rolls) {
   std::vector<backgammonr::DiceRoll> out;
   out.reserve(rolls.size());
@@ -72,7 +82,9 @@ std::vector<backgammonr::DiceRoll> parse_roll_vector(const Rcpp::List& rolls) {
   return out;
 }
 
-// Pick active selection rule based on whose turn it is.
+// Function: selection_for_player_unchecked
+// Purpose: Resolve current player's selector without extra branching in loops.
+// Called by: simulate_one_game_random(), simulate_one_game_with_rolls().
 const std::string& selection_for_player_unchecked(
     const int player,
     const std::string& player1_selection,
@@ -80,7 +92,9 @@ const std::string& selection_for_player_unchecked(
   return player == 1 ? player1_selection : player2_selection;
 }
 
-// Convert winner code to stable user-facing label.
+// Function: winner_label
+// Purpose: Convert winner integer code into stable text label.
+// Called by: games_to_data_frame().
 std::string winner_label(const int winner) {
   if (winner == 1) {
     return "player_1";
@@ -93,7 +107,9 @@ std::string winner_label(const int winner) {
   return "none";
 }
 
-// Fast path for pure random-policy turns (hot loop in simulations).
+// Function: play_random_turn_with_roll_lightweight
+// Purpose: Fast random-policy turn execution used in hot simulation loops.
+// Called by: simulate_one_game_random(), simulate_one_game_with_rolls().
 void play_random_turn_with_roll_lightweight(
     backgammonr::BoardState& board,
     const backgammonr::DiceRoll& roll,
@@ -101,7 +117,10 @@ void play_random_turn_with_roll_lightweight(
   (void) backgammonr::play_random_turn_rollout_fast(board, roll, rng);
 }
 
-// Simulate one game with random dice.
+// Function: simulate_one_game_random
+// Purpose: Simulate a single game trajectory under random dice generation.
+// Called by: simulate_matchup_random().
+// Notes: This is the per-replication kernel for random-dice experiments.
 backgammonr::SimulatedGameSummary simulate_one_game_random(
     const backgammonr::BoardState& initial_board,
     const int game_id,
@@ -110,13 +129,7 @@ backgammonr::SimulatedGameSummary simulate_one_game_random(
     const std::string& player1_selection,
     const std::string& player2_selection,
     const backgammonr::RolloutConfig& rollout_config) {
-  // **WHAT IT'S DOING (DETAILED):**
-  // This function plays exactly one stochastic game trajectory.
-  // - It starts from a fixed board state.
-  // - Each turn chooses a policy based on whose turn it is.
-  // - It applies one move, checks terminal status, and records metadata.
-  // - It stops on game-over or turn budget exhaustion.
-  // how long it took, and whether we hit stopping limits.
+  // One game-level record is filled as the trajectory evolves.
   backgammonr::SimulatedGameSummary out;
   out.game_id = game_id;
 
@@ -165,7 +178,10 @@ backgammonr::SimulatedGameSummary simulate_one_game_random(
   return out;
 }
 
-// Simulate one game with scripted roll sequence.
+// Function: simulate_one_game_with_rolls
+// Purpose: Simulate a single game trajectory with scripted dice outcomes.
+// Called by: simulate_matchup_with_rolls().
+// Notes: Used for controlled/replayable comparisons across selection methods.
 backgammonr::SimulatedGameSummary simulate_one_game_with_rolls(
     const backgammonr::BoardState& initial_board,
     const std::vector<backgammonr::DiceRoll>& rolls,
@@ -175,10 +191,7 @@ backgammonr::SimulatedGameSummary simulate_one_game_with_rolls(
     const std::string& player2_selection,
     std::mt19937* rng,
     const backgammonr::RolloutConfig& rollout_config) {
-  // **WHAT IT'S DOING (DETAILED):** Same one-game simulation skeleton as the
-  // random-dice version, but dice outcomes come from a fixed scripted sequence.
-  // This supports controlled experiments (shared randomness / replayability).
-  // reproducible and easier to compare across methods.
+  // Same structure as random-dice kernel, but roll values are externally fixed.
   backgammonr::SimulatedGameSummary out;
   out.game_id = game_id;
 
@@ -191,7 +204,7 @@ backgammonr::SimulatedGameSummary simulate_one_game_with_rolls(
   backgammonr::BoardState current = initial_board;
   for (int turn_index = 0; turn_index < max_turns; ++turn_index) {
     // Script exhausted before turn cap.
-  if (turn_index >= static_cast<int>(rolls.size())) {
+    if (turn_index >= static_cast<int>(rolls.size())) {
       // Script ended before the simulation reached terminal state or turn cap.
       out.roll_sequence_exhausted = true;
       break;
@@ -232,7 +245,9 @@ backgammonr::SimulatedGameSummary simulate_one_game_with_rolls(
   return out;
 }
 
-// Convert per-game simulation records into rectangular R table.
+// Function: games_to_data_frame
+// Purpose: Convert per-game simulation records into row-wise R table.
+// Called by: matchup_simulation_result_to_list().
 Rcpp::DataFrame games_to_data_frame(const backgammonr::MatchupSimulationResult& result) {
   const int n = static_cast<int>(result.games.size());
   Rcpp::IntegerVector game_id(n);
@@ -265,11 +280,10 @@ Rcpp::DataFrame games_to_data_frame(const backgammonr::MatchupSimulationResult& 
       Rcpp::_["stringsAsFactors"] = false);
 }
 
-// Aggregate matchup-level summary statistics.
+// Function: summary_to_data_frame
+// Purpose: Aggregate game-level outputs into one-row matchup summary metrics.
+// Called by: matchup_simulation_result_to_list().
 Rcpp::DataFrame summary_to_data_frame(const backgammonr::MatchupSimulationResult& result) {
-  // **WHAT IT'S DOING (DETAILED):** Reduces per-game records into one-row
-  // benchmark summary statistics: completion counts, win rates, and turn-length
-  // distribution summaries.
   int completed_games = 0;
   int unresolved_games = 0;
   int player1_wins = 0;
@@ -347,7 +361,10 @@ Rcpp::DataFrame summary_to_data_frame(const backgammonr::MatchupSimulationResult
 
 namespace backgammonr {
 
-// Public C++ API: simulate many games with random dice.
+// Function: simulate_matchup_random
+// Purpose: Batch driver for `n_games` independent random-dice simulations.
+// Called by: bg_cpp_simulate_matchup_random(),
+// bg_cpp_simulate_matchup_random_rollout(), benchmark_matchup_random().
 MatchupSimulationResult simulate_matchup_random(
     const BoardState& initial_board,
     const int n_games,
@@ -356,9 +373,6 @@ MatchupSimulationResult simulate_matchup_random(
     const std::string& player1_selection,
     const std::string& player2_selection,
     const RolloutConfig& rollout_config) {
-  // **WHAT IT'S DOING (DETAILED):** Batch driver for random-dice experiments.
-  // Validates configuration once, then replays `n_games` independent trajectories
-  // from the same initial board and stores all game-level outcomes.
   // Validate selector labels and simulation controls before running any game.
   validate_selection(player1_selection);
   validate_selection(player2_selection);
@@ -394,7 +408,10 @@ MatchupSimulationResult simulate_matchup_random(
   return result;
 }
 
-// Public C++ API: simulate many games using scripted dice sequence.
+// Function: simulate_matchup_with_rolls
+// Purpose: Batch driver for `n_games` scripted-dice simulations.
+// Called by: bg_cpp_simulate_matchup_scripted(),
+// bg_cpp_simulate_matchup_scripted_rollout(), benchmark_matchup_with_rolls().
 MatchupSimulationResult simulate_matchup_with_rolls(
     const BoardState& initial_board,
     const std::vector<DiceRoll>& rolls,
@@ -404,9 +421,6 @@ MatchupSimulationResult simulate_matchup_with_rolls(
     const std::string& player2_selection,
     std::mt19937* rng,
     const RolloutConfig& rollout_config) {
-  // **WHAT IT'S DOING (DETAILED):** Batch driver for scripted-dice experiments.
-  // Every game sees the same scripted roll prefix, isolating policy effects from
-  // dice-sequence variability.
   // Same validation contract as random-dice entry point.
   validate_selection(player1_selection);
   validate_selection(player2_selection);
@@ -442,7 +456,9 @@ MatchupSimulationResult simulate_matchup_with_rolls(
   return result;
 }
 
-// Convert internal result object to R list object used by R wrappers.
+// Function: matchup_simulation_result_to_list
+// Purpose: Package simulation output into R-friendly list bundle.
+// Called by: all exported simulation wrappers in this file.
 Rcpp::List matchup_simulation_result_to_list(const MatchupSimulationResult& result) {
   // Keep both granular (games) and aggregate (summary/settings) views.
   return Rcpp::List::create(
@@ -463,6 +479,10 @@ Rcpp::List matchup_simulation_result_to_list(const MatchupSimulationResult& resu
 }  // namespace backgammonr
 
 // [[Rcpp::export]]
+// Function: bg_cpp_simulate_matchup_random
+// Purpose: Rcpp entry point for random-dice simulation without explicit rollout
+// policy tuning.
+// Called by: R wrapper `simulate_matchup(..., scripted_rolls = NULL)`.
 Rcpp::List bg_cpp_simulate_matchup_random(
     const Rcpp::List& board,
     const int n_games,
@@ -471,8 +491,6 @@ Rcpp::List bg_cpp_simulate_matchup_random(
     const std::string& player2_selection,
     const int seed,
     const bool use_seed) {
-  // **WHAT IT'S DOING (DETAILED):** Exported Rcpp entry point for random-dice
-  // simulations without explicit rollout-policy parameters.
   // Parse board and initialize RNG once for the full simulation batch.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   std::mt19937 rng = init_rng(seed, use_seed);
@@ -490,6 +508,9 @@ Rcpp::List bg_cpp_simulate_matchup_random(
 }
 
 // [[Rcpp::export]]
+// Function: bg_cpp_simulate_matchup_scripted
+// Purpose: Rcpp entry point for scripted-dice simulation.
+// Called by: R wrapper `simulate_matchup(..., scripted_rolls = <list>)`.
 Rcpp::List bg_cpp_simulate_matchup_scripted(
     const Rcpp::List& board,
     const Rcpp::List& rolls,
@@ -499,10 +520,7 @@ Rcpp::List bg_cpp_simulate_matchup_scripted(
     const std::string& player2_selection,
     const int seed,
     const bool use_seed) {
-  // **WHAT IT'S DOING (DETAILED):** Exported Rcpp entry point for scripted-dice
-  // simulations. RNG is created only if any selected policy actually uses
-  // randomness, avoiding unnecessary setup.
-  // overhead when deterministic policies are used.
+  // RNG is only created when at least one selected policy is stochastic.
   // Parse board + scripted rolls up front.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::DiceRoll> parsed_rolls = parse_roll_vector(rolls);
@@ -528,6 +546,10 @@ Rcpp::List bg_cpp_simulate_matchup_scripted(
 }
 
 // [[Rcpp::export]]
+// Function: bg_cpp_simulate_matchup_random_rollout
+// Purpose: Rcpp entry point for random-dice simulation with explicit rollout
+// config fields.
+// Called by: R wrapper path used when rollout knobs are provided.
 Rcpp::List bg_cpp_simulate_matchup_random_rollout(
     const Rcpp::List& board,
     const int n_games,
@@ -539,9 +561,7 @@ Rcpp::List bg_cpp_simulate_matchup_random_rollout(
     const int max_rollout_turns,
     const int seed,
     const bool use_seed) {
-  // **WHAT IT'S DOING (DETAILED):** Same as `bg_cpp_simulate_matchup_random`,
-  // but explicitly threads rollout-policy parameters into the simulation config.
-  // Random-dice rollout matchup wrapper (rollout policies enabled).
+  // Same as random wrapper, but threads rollout-policy parameters explicitly.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   std::mt19937 rng = init_rng(seed, use_seed);
   // Rollout-specific config used when players are rollout family selectors.
@@ -559,6 +579,10 @@ Rcpp::List bg_cpp_simulate_matchup_random_rollout(
 }
 
 // [[Rcpp::export]]
+// Function: bg_cpp_simulate_matchup_scripted_rollout
+// Purpose: Rcpp entry point for scripted-dice simulation with explicit rollout
+// config fields.
+// Called by: R scripted simulation wrapper with rollout controls.
 Rcpp::List bg_cpp_simulate_matchup_scripted_rollout(
     const Rcpp::List& board,
     const Rcpp::List& rolls,
@@ -571,10 +595,7 @@ Rcpp::List bg_cpp_simulate_matchup_scripted_rollout(
     const int max_rollout_turns,
     const int seed,
     const bool use_seed) {
-  // **WHAT IT'S DOING (DETAILED):** Scripted-dice + rollout-config export path.
-  // Useful for reproducible method comparisons where both dice sequence and
-  // rollout policy parameters are controlled.
-  // Scripted-dice rollout matchup wrapper (rollout policies enabled).
+  // Scripted-dice wrapper with rollout controls for reproducible comparisons.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::DiceRoll> parsed_rolls = parse_roll_vector(rolls);
   std::mt19937 rng = init_rng(seed, use_seed);
