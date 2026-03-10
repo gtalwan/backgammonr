@@ -1,23 +1,26 @@
 Package: backgammonr
 Type: Package
-Title: Thompson-Centered Finite-Budget Backgammon Rollout Allocation
-Version: 0.2.0
+Title: Finite-Budget Rollout Allocation for Backgammon
+Version: 0.2.1
 Authors@R:
-    person(given = "OpenAI",
-           family = "Assistant",
+    person(given = "Gabriel",
+           family = "Alwan",
            role = c("aut", "cre"),
-           email = "assistant@example.com")
-Author: OpenAI Assistant [aut, cre]
-Maintainer: OpenAI Assistant <assistant@example.com>
-Description: Statistical-computing tools for finite-budget rollout allocation
-    in backgammon, centered on Thompson sampling for best-action
-    identification under simulation noise. The package combines a C++
-    backgammon engine with Monte Carlo action-evaluation infrastructure,
-    high-budget reference estimation, and baseline comparison methods
-    (equal/UCB/OCBA/greedy). Outputs emphasize proxy probability of correct
-    selection, simple regret, value-estimation error, and runtime
-    speed-accuracy tradeoffs.
+           email = "gabriel.alwan@gmail.com")
+Author: Gabriel Alwan [aut, cre]
+Maintainer: Gabriel Alwan <gabriel.alwan@gmail.com>
+Description: Research-oriented statistical-computing tools for finite-budget
+    simulation allocation in backgammon. The package frames a board state plus
+    realized dice roll as a ranking-and-selection problem under Monte Carlo
+    noise and centers Thompson sampling and related allocation rules for
+    best-action identification. It combines a C++ backgammon engine, rollout
+    value estimation, high-budget reference approximation, baseline comparison
+    methods, benchmarking helpers, and reporting tools for probability of
+    correct selection, simple regret, value-estimation error, and runtime
+    tradeoffs.
 License: MIT + file LICENSE
+URL: https://github.com/gtalwan/backgammonr
+BugReports: https://github.com/gtalwan/backgammonr/issues
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)

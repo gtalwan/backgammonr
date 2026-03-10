@@ -1,190 +1,263 @@
 # backgammonr
 
-`backgammonr` is a statistical computing package for studying **finite-budget rollout allocation**, with **Thompson sampling** as the central method and backgammon as the stochastic testbed.
+`backgammonr` is an R package for finite-budget Monte Carlo action evaluation
+in backgammon. It treats a single board state plus a realized dice roll as a
+ranking-and-selection problem under simulation noise:
 
-The package is not a strong-play backgammon AI package. Its core focus is best-action identification under simulation noise.
+- what are the legal actions?
+- how should a fixed rollout budget be allocated across them?
+- how much evidence supports the recommended move?
 
+The package is centered on Thompson sampling and closely related allocation
+rules. Backgammon is the stochastic testbed, not the final objective. The core
+contribution is a statistical workflow for best-action identification when
+rollout evaluations are noisy and budget is limited.
 
-NOTE: The main statistical and simulation logic of the project lives in a few C++ files in the src/ folder: bg_allocation.cpp, bg_rollout.cpp, bg_thompson_rollout.cpp, bg_simulation.cpp, and bg_benchmark.cpp. These are really the core of the project. They handle the Monte Carlo simulation, rollout evaluation, adaptive sampling methods, and the benchmarking framework used to compare different approaches. These files are also heavily commented, which makes it fairly straightforward to follow the logic of how simulations are generated, how rollouts are evaluated, and how the allocation strategies are applied.
+## Statistical framing
 
-Overall these five files contain the core statistical and simulation logic of the project. Many of the other files in the repository, particularly those related to plotting, board visualization, and parts of the game mechanics, were largely helped along by generative AI during development. Because of that, those files will need additional inspection and cleanup to verify correctness, simplify the structure, and remove redundancy. The focus so far has been making sure the statistical allocation and simulation framework is working properly, and those components are primarily implemented in the C++ files described above.
+For a decision instance `d = (state, realized_roll)` with legal actions
+`A_d = {1, ..., K}`, the package studies finite-budget action evaluation under
+Monte Carlo rewards in `[0, 1]`. A method receives a rollout budget `N`,
+distributes that budget across candidate actions, and returns a recommended
+action `a_hat_N`.
 
-bg_allocation.cpp is the most important file from the statistical side. This is where the allocation logic is implemented. The goal of this file is to determine how a fixed simulation budget should be distributed across candidate moves. Instead of dividing simulations evenly, the code supports several strategies including equal allocation, greedy allocation based on posterior means, UCB style rules, Thompson sampling, top two Thompson sampling, and an OCBA style allocation rule. The file first generates the legal moves and collapses moves that lead to the same resulting board state so that simulation effort is not wasted on equivalent positions. For each candidate move the code runs rollouts, which simulate the rest of the game starting from that position. Outcomes are tracked using a Beta Bernoulli framework where each move maintains alpha and beta parameters representing a posterior distribution over its win probability. These posterior estimates are then used by the allocation rules to decide which move should receive the next simulation.
+The main research question is:
 
-bg_rollout.cpp provides a simpler interface for running traditional rollout evaluations. In this case the allocation method is fixed to equal allocation, so each candidate move receives roughly the same number of simulations. Rather than implementing a completely separate rollout system, this file simply calls the allocation engine with the equal allocation option. Its main role is to expose cleaner user facing functions for evaluating moves and returning summaries such as win rates and simulation counts.
+> Does Thompson sampling use a fixed rollout budget more effectively than simple
+> baselines when the goal is to identify the rollout-model best action?
 
-bg_thompson_rollout.cpp works in a similar way but focuses on Thompson sampling. Instead of allocating simulations evenly, it uses Thompson sampling to determine which candidate move should receive the next rollout. The underlying Thompson sampling logic still lives in bg_allocation.cpp; this file mainly acts as a wrapper that exposes a simpler interface for running Thompson based rollout experiments and returning the most relevant statistics.
+The package therefore emphasizes:
 
-bg_simulation.cpp handles full game simulation. Instead of evaluating a single move, this file simulates complete backgammon games between two policies. Each turn a player selects a move according to its policy, which might be random play, rollout based decision making, or Thompson sampling. The file includes functions for simulating individual games and for running batches of many games. After simulations are complete the results are aggregated into summaries such as win rates, number of turns, and whether games reached the turn limit.
+- posterior-style uncertainty summaries;
+- probability-of-being-best style diagnostics;
+- proxy probability of correct selection (PCS);
+- simple regret against a high-budget reference;
+- action-value MSE;
+- runtime and speed/accuracy tradeoffs.
 
-bg_benchmark.cpp provides a framework for running structured experiments that compare different methods. It supports evaluating decision methods on multiple positions as well as running repeated game simulations between policies. One important feature is that it carefully manages random number seeds so experiments are reproducible and comparisons between methods are fair. The benchmarking code records which moves each method selects, how often those selections match a reference estimate, and how long each method takes to run.
+## What The Package Is And Is Not
 
+`backgammonr` is:
 
+- a research-oriented statistical computing package;
+- a backgammon rollout engine wrapped in R for experimentation;
+- a toolkit for comparing adaptive and non-adaptive allocation rules.
 
+`backgammonr` is not:
 
-## Core Research Question
+- a full-strength competitive backgammon bot;
+- a claim of exact game-theoretic truth;
+- a package focused on the doubling cube, match equity, or human-style play.
 
-For one decision instance
+## Installation
 
-- `d = (state, realized_roll)`,
-- legal actions `A_d = {1, ..., K}`,
-- rollout rewards `Y_i in [0,1]`,
-- action means `mu_i = E[Y_i]`,
-
-we study whether Thompson sampling allocates a finite rollout budget `N` efficiently for recommending the rollout-model best action.
-
-Under budget `N`, a method outputs `a_hat_N`. We evaluate quality relative to a **high-budget reference estimate (proxy truth)**.
-
-## What Is Central vs Baseline
-
-Central method family:
-
-- `evaluate_actions_thompson()`
-- `evaluate_actions_ttts()` (Top-Two Thompson)
-- `trace_thompson_allocation()`
-- `compare_thompson_to_reference()`
-- `benchmark_thompson()`
-- `summarize_thompson_benchmark()`
-
-Comparison baselines:
-
-- `evaluate_actions_equal()`
-- `evaluate_actions_ucb()`
-- `evaluate_actions_ocba()`
-- `evaluate_actions_greedy()`
-
-Reference-estimation tools:
-
-- `approximate_action_reference()` (alias of `approximate_action_truth()`)
-- `certify_reference_truth()`
-
-## Installation (Local Source)
+### Install from GitHub
 
 ```r
-# Run from the package root directory
+install.packages("remotes")
+remotes::install_github("gtalwan/backgammonr")
+library(backgammonr)
+```
+
+### Install from local source
+
+```r
+setwd("/path/to/backgammonr")
 install.packages(".", repos = NULL, type = "source")
 library(backgammonr)
 ```
 
-## Thompson Quick Start
+## Recommended Workflow
+
+1. Create a board and realized roll with `bg_initial_board()` and `bg_roll()`.
+2. Enumerate candidate actions with `generate_legal_moves()`.
+3. Run a finite-budget evaluator such as `evaluate_actions_thompson()`.
+4. Build a higher-budget proxy truth with `approximate_action_reference()`.
+5. Compare finite-budget output to the reference with
+   `compare_thompson_to_reference()`.
+6. Study stability across budgets, variance controls, and benchmark cases.
+
+This workflow is the backbone of the vignettes and the main user-facing API.
+
+## Main Statistical Functions
+
+| Question | Primary functions | What they do |
+| --- | --- | --- |
+| What position am I analyzing? | `bg_initial_board()`, `bg_roll()`, `generate_legal_moves()`, `summarize_legal_moves()` | Construct a reproducible decision instance and inspect the candidate action set. |
+| How should I allocate a fixed budget now? | `evaluate_actions_thompson()`, `evaluate_actions_ttts()` | Run Thompson-family adaptive allocation and return recommendation, uncertainty, and allocation summaries. |
+| What baselines should I compare against? | `evaluate_actions_equal()`, `evaluate_actions_ucb()`, `evaluate_actions_ocba()`, `evaluate_actions_greedy()` | Evaluate simpler or alternative budget-allocation rules on the same position. |
+| What is the proxy truth for this position? | `approximate_action_reference()`, `approximate_action_truth()`, `certify_reference_truth()` | Build a higher-budget reference estimate and attach a certificate describing the strength of the reference. |
+| How close is Thompson to the reference? | `compare_thompson_to_reference()`, `compare_methods_on_position()` | Measure proxy PCS, simple regret, MSE, runtime, and action-by-action gaps. |
+| How does allocation evolve over budget? | `trace_thompson_allocation()`, `trace_allocation_history()`, `plot_thompson_convergence()` | Inspect checkpoint-by-checkpoint allocation dynamics and recommendation stability. |
+| How sensitive are results to budget and variance controls? | `study_budget_tradeoff()`, `study_variance_controls()` | Run structured experiments over budgets, dice modes, and common random number settings. |
+| How do methods compare over many cases? | `benchmark_allocation_methods()`, `benchmark_thompson()`, `summarize_thompson_benchmark()` | Benchmark methods across curated positions and summarize selection accuracy and runtime. |
+| How do I explain or visualize results? | `bg_explain_recommendation()`, `bg_analysis_report()`, `plot_thompson_vs_baselines()`, `bg_plot_benchmark_summary()` | Turn raw evaluation output into readable tables, explanations, and plots. |
+
+## Quick Start: Finite-Budget Thompson Evaluation
 
 ```r
-board <- bg_initial_board()
-roll  <- bg_roll(1L, 6L)
+library(backgammonr)
 
-res <- evaluate_actions_thompson(
+board <- bg_initial_board()
+roll <- bg_roll(1L, 6L)
+
+legal <- generate_legal_moves(board, roll)
+summarize_legal_moves(legal, max_candidates = 10L)
+
+th <- evaluate_actions_thompson(
   board = board,
   roll = roll,
-  total_budget = 1000L,
+  total_budget = 800L,
   rollout_policy = "random",
-  max_rollout_turns = 300L,
-  seed = 1L
+  max_rollout_turns = 220L,
+  fast_diagnostics = FALSE,
+  seed = 11L
 )
 
-res$results[order(res$results$rank), c(
-  "rank", "move_label", "allocation_count", "estimate",
-  "prob_best", "posterior_expected_regret", "recommended"
+summary(th)[, c(
+  "method",
+  "total_budget",
+  "recommended_move_label",
+  "recommended_estimate",
+  "recommended_prob_best",
+  "recommended_expected_regret",
+  "recommended_allocation_count",
+  "runtime_seconds"
+)]
+
+th[["results"]][, c(
+  "move_label",
+  "recommended",
+  "allocation_count",
+  "estimate",
+  "posterior_sd",
+  "prob_best",
+  "posterior_expected_regret"
 )]
 ```
 
-## Thompson vs Reference Example
+This is the central package call: it returns both a one-row summary and a
+candidate-level result table with allocation counts, estimates, uncertainty,
+probability-best style diagnostics, and a recommendation flag.
+
+## Reference And Comparison Workflow
 
 ```r
+library(backgammonr)
+
+board <- bg_initial_board()
+roll <- bg_roll(1L, 6L)
+
 ref <- approximate_action_reference(
-  board = bg_initial_board(),
-  roll = bg_roll(1L, 6L),
-  truth_budget = 30000L,  # quick option: 4000L
+  board = board,
+  roll = roll,
+  truth_budget = 5000L,
   rollout_policy = "random",
-  max_rollout_turns = 300L,
-  seed = 1L
+  max_rollout_turns = 220L,
+  seed = 21L
 )
 
-cert <- certify_reference_truth(reference = ref)
+cert <- certify_reference_truth(ref)
 
 cmp <- compare_thompson_to_reference(
-  board = bg_initial_board(),
-  roll = bg_roll(1L, 6L),
+  board = board,
+  roll = roll,
   method = "thompson",
-  total_budget = 1000L,
+  total_budget = 800L,
   reference = ref,
   reference_certificate = cert,
   rollout_policy = "random",
-  max_rollout_turns = 300L,
-  seed = 1L
+  max_rollout_turns = 220L,
+  seed = 11L
 )
 
 cmp$summary
-head(cmp$action_table)
+cmp$action_table[, c(
+  "move_label",
+  "estimate",
+  "reference_estimate",
+  "estimate_error",
+  "prob_best",
+  "simple_regret",
+  "mse"
+)]
 ```
 
-## Main Evaluation Targets
+The reference is a high-budget proxy truth, not exact truth. That distinction is
+important when interpreting proxy PCS or regret values on difficult positions.
 
-- proxy PCS (correct selection vs reference-best action),
-- simple regret vs reference estimate,
-- action-value MSE vs reference estimate,
-- runtime and speed/accuracy tradeoff.
+## Study And Benchmark Helpers
 
-## How To Evaluate Thompson Behavior
+Once a single position workflow is clear, the package exposes several higher
+level experiment helpers.
 
-Use this sequence on each case:
+- `study_budget_tradeoff()` asks how recommendation quality changes as total
+  budget increases.
+- `study_variance_controls()` examines the effect of dice modes and common
+  random numbers on variance and runtime.
+- `benchmark_allocation_methods()` and `benchmark_thompson()` run repeated
+  method comparisons over curated benchmark cases.
+- `summarize_thompson_benchmark()` compresses multi-case experiments into
+  readable accuracy, regret, and runtime summaries.
 
-1. Run `evaluate_actions_thompson(...)` and inspect:
-   - recommended action,
-   - allocation concentration (`alloc_n`),
-   - uncertainty (`uncertainty_sd`, `ci95_*`),
-   - `prob_best` and `exp_regret`.
-2. Compare to a high-budget reference with `compare_thompson_to_reference(...)`:
-   - proxy PCS,
-   - simple regret,
-   - MSE,
-   - runtime.
-3. Inspect dynamics with `trace_thompson_allocation(...)`:
-   - leader stability vs checkpoint,
-   - allocation shifts over budget.
-4. Compare against baselines and across budgets:
-   - `compare_methods_on_position(...)`,
-   - `study_budget_tradeoff(...)`,
-   - `benchmark_thompson(...)`.
+These functions are designed for repeated statistical experiments rather than
+one-off exploratory calls.
 
-Interpret results honestly:
+## Key Output Columns
 
-- Encouraging: early PCS gains, lower regret, focused allocation, shrinking uncertainty.
-- Cautionary: small-budget instability, state-dependent gains, near-tie ambiguity, and proxy-truth limitations.
+Most action-evaluation tables use a shared vocabulary. The most important
+columns are:
+
+- `move_label`: a readable label for the candidate move.
+- `allocation_count`: how many rollouts the method spent on that move.
+- `estimate`: the estimated win probability or value under the rollout model.
+- `posterior_sd`: posterior-style uncertainty summary for the estimate.
+- `prob_best`: estimated probability that the move is currently best.
+- `posterior_expected_regret`: regret-like summary under the posterior.
+- `recommended`: whether the move is the method's recommendation.
+- `runtime_seconds`: wall-clock runtime for the evaluation call.
+
+These defaults are meant to be interpretable without hiding the underlying
+simulation structure.
+
+## Repository Layout
+
+The package is organized around a small set of R and C++ files that carry most
+of the statistical logic.
+
+| Path | Role |
+| --- | --- |
+| `R/allocation_methods.R` | High-level action-evaluation APIs and shared allocation helpers. |
+| `R/thompson_research.R` | Thompson-specific comparison, tracing, and benchmark helpers. |
+| `R/statistical_studies.R` | Budget and variance-control study wrappers. |
+| `R/statistical_api.R` | User-facing aliases and research-friendly entry points. |
+| `R/visualization.R` | Tables, plots, and reporting helpers for evaluation outputs. |
+| `src/bg_allocation.cpp` | Core finite-budget allocation engine and posterior bookkeeping. |
+| `src/bg_rollout.cpp` | Equal-allocation rollout wrappers. |
+| `src/bg_thompson_rollout.cpp` | Thompson-family rollout wrappers. |
+| `src/bg_simulation.cpp` | Full-game simulation kernels and matchup drivers. |
+| `src/bg_benchmark.cpp` | Structured benchmarking across positions and methods. |
 
 ## Documentation
 
-- Deep-documentation generator script:
-  - [scripts/generate_vignettes.R](scripts/generate_vignettes.R)
-- Example-validation runner (executes core vignette workflow and writes output artifacts):
-  - [scripts/run_vignette_examples.R](scripts/run_vignette_examples.R)
-- Canonical vignette sequence:
-  - [vignettes/01_project_motivation.Rmd](vignettes/01_project_motivation.Rmd)
-  - [vignettes/02_thompson_sampling_theory.Rmd](vignettes/02_thompson_sampling_theory.Rmd)
-  - [vignettes/03_package_methodology.Rmd](vignettes/03_package_methodology.Rmd)
-  - [vignettes/04_backgammon_basics.Rmd](vignettes/04_backgammon_basics.Rmd)
-  - [vignettes/05_thompson_workflow.Rmd](vignettes/05_thompson_workflow.Rmd)
-  - [vignettes/06_main_question_example.Rmd](vignettes/06_main_question_example.Rmd)
-  - [vignettes/07_easy_function_calls.Rmd](vignettes/07_easy_function_calls.Rmd)
-- Thompson motivation and package positioning:
-  - [docs/THOMPSON_MOTIVATION.md](docs/THOMPSON_MOTIVATION.md)
-- End-to-end mechanics + Thompson workflow/testing guide:
-  - [docs/STATISTICAL_WORKFLOW.md](docs/STATISTICAL_WORKFLOW.md)
-- Standalone copy-paste example bubbles:
-  - [docs/EXAMPLE_BUBBLES.md](docs/EXAMPLE_BUBBLES.md)
-- Function reference:
-  - [docs/FUNCTION_REFERENCE.md](docs/FUNCTION_REFERENCE.md)
-- Implementation and optimization deep dive:
-  - [docs/IMPLEMENTATION_DEEP_DIVE.md](docs/IMPLEMENTATION_DEEP_DIVE.md)
+The package documentation is layered from introductory workflow to deeper
+implementation material.
 
-Regenerate and validate docs:
-
-```r
-system("Rscript scripts/generate_vignettes.R --check")
-system("Rscript scripts/run_vignette_examples.R --quick")
-```
+- [vignettes/05_thompson_workflow.Rmd](vignettes/05_thompson_workflow.Rmd)
+  gives a Thompson-centered walkthrough.
+- [vignettes/06_main_question_example.Rmd](vignettes/06_main_question_example.Rmd)
+  develops the main research question in more detail.
+- [vignettes/07_easy_function_calls.Rmd](vignettes/07_easy_function_calls.Rmd)
+  is the most direct, step-by-step user workflow.
+- [docs/FUNCTION_REFERENCE.md](docs/FUNCTION_REFERENCE.md) catalogs the API.
+- [docs/IMPLEMENTATION_DEEP_DIVE.md](docs/IMPLEMENTATION_DEEP_DIVE.md)
+  explains the internal design and optimization choices.
 
 ## Interpretation Notes
 
-- “Best action” is model-relative: best under the rollout model and settings.
-- High-budget reference output is a proxy truth, not exact game-theoretic truth.
-- Baseline methods are retained for comparison; Thompson sampling is the conceptual center.
+- "Best action" always means best under the current rollout model and rollout
+  settings.
+- A higher-budget reference is still a Monte Carlo estimate, not exact truth.
+- Small-budget recommendations can be unstable on near-tie positions.
+- Runtime comparisons should be interpreted together with recommendation
+  quality, not in isolation.

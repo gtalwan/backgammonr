@@ -4,40 +4,73 @@
 \name{backgammonr-package}
 \alias{backgammonr}
 \alias{backgammonr-package}
-\title{backgammonr: Finite-budget rollout allocation with Thompson sampling}
+\title{backgammonr: Finite-budget rollout allocation for backgammon}
 \description{
-\code{backgammonr} is a statistical computing package for studying finite-budget
-rollout allocation under simulation noise, using backgammon as a stochastic
-testbed.
+\code{backgammonr} is a research-oriented statistical computing package for
+finite-budget rollout allocation under simulation noise, using backgammon as
+a stochastic testbed.
 }
 \details{
 The package centers on this decision problem:
 \itemize{
 \item for one decision instance \verb{(state, realized_roll)}, legal actions
-\verb{A_d = \{1, ..., K\}}, and rollout rewards in \verb{[0,1]}, can Thompson sampling
-efficiently allocate a fixed budget \code{N} to identify the rollout-model best
-action?
+\verb{A_d = \{1, ..., K\}}, and rollout rewards in \verb{[0, 1]}, can Thompson
+sampling allocate a fixed simulation budget \code{N} efficiently enough to
+identify the rollout-model best action?
 }
 
 In package terms, a \emph{rollout} is one Monte Carlo continuation from a chosen
 action. Repeated rollouts estimate action values under a specified rollout
-model.
+policy and turn the move-choice problem into a ranking-and-selection task.
 
 The package combines:
 \itemize{
 \item a C++ backgammon engine for legal move generation and state transitions;
-\item Thompson-family allocation (\code{thompson}, \code{ttts}) as central methods;
+\item Thompson-family allocation (\code{thompson}, \code{ttts}) as the conceptual center;
 \item baseline allocation methods (\code{equal}, \code{greedy}, \code{ucb}, \code{ocba}) for
-comparison;
-\item reference-estimation and benchmark tools for proxy PCS, simple regret, MSE,
-and runtime tradeoffs.
+controlled comparison;
+\item reference-estimation, study, benchmark, and reporting tools for proxy PCS,
+simple regret, value-estimation error, and runtime tradeoffs.
+}
+}
+\section{Main workflow}{
+
+A typical user workflow is:
+\itemize{
+\item construct a board and realized roll;
+\item enumerate legal actions;
+\item evaluate the action set under a finite budget;
+\item build a higher-budget reference estimate;
+\item compare the finite-budget recommendation to the reference;
+\item summarize stability across budgets or benchmark cases.
+}
+}
+
+\section{Central exported functions}{
+
+Important user-facing entry points include:
+\itemize{
+\item \code{evaluate_actions_thompson()} and \code{evaluate_actions_ttts()};
+\item \code{approximate_action_reference()} and \code{certify_reference_truth()};
+\item \code{compare_thompson_to_reference()};
+\item \code{study_budget_tradeoff()} and \code{study_variance_controls()};
+\item \code{benchmark_thompson()} and \code{summarize_thompson_benchmark()}.
 }
 
 Core loops use \code{Rcpp}/\code{RcppArmadillo} with batched C++ simulation calls for
 high-throughput research workflows.
 }
+
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/gtalwan/backgammonr}
+  \item Report bugs at \url{https://github.com/gtalwan/backgammonr/issues}
+}
+
+}
 \author{
-\strong{Maintainer}: OpenAI Assistant \email{assistant@example.com}
+\strong{Maintainer}: Gabriel Alwan \email{gabriel.alwan@gmail.com}
 
 }
 \keyword{internal}

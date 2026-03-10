@@ -10,6 +10,8 @@ compare_thompson_to_reference(
   method = c("thompson", "ttts"),
   total_budget = 512L,
   reference_budget = 8192L,
+  reference = NULL,
+  reference_certificate = NULL,
   ttts_beta = 0.5,
   rollout_policy = c("random", "aggressive", "defensive"),
   max_rollout_turns = 1000L,
@@ -36,6 +38,15 @@ compare_thompson_to_reference(
 
 \item{reference_budget}{Integer-like high simulation budget for the reference
 estimate.}
+
+\item{reference}{Optional precomputed \code{bg_action_evaluation} object from
+\code{\link[=approximate_action_reference]{approximate_action_reference()}} or \code{\link[=approximate_action_truth]{approximate_action_truth()}}. When
+supplied, the function reuses it instead of recomputing reference
+rollouts.}
+
+\item{reference_certificate}{Optional precomputed \code{bg_reference_certificate}
+object from \code{\link[=certify_reference_truth]{certify_reference_truth()}}. Supply this with \code{reference} to
+avoid recomputing certification.}
 
 \item{ttts_beta}{Numeric scalar in \verb{(0, 1]} used when \code{method = "ttts"}.}
 
