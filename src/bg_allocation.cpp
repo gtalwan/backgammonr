@@ -1,122 +1,48 @@
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::depends(RcppArmadillo)]]
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <RcppArmadillo.h>
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Core statistical-allocation engine.
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 //
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // This file implements the finite-budget sampling logic used across methods:
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - equal allocation
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - greedy posterior-mean allocation
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - UCB-style allocation
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - Thompson sampling
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - top-two Thompson sampling (TTTS)
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - OCBA-style approximate allocation
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 //
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // The same engine is reused by multiple wrappers so method comparisons differ
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // by policy choice rather than by duplicated simulation code paths.
 
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_allocation.h"
 
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <algorithm>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <array>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <chrono>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <cmath>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <cstdint>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <limits>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <optional>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <random>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <sstream>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <stdexcept>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <string>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <unordered_map>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <vector>
 
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_game.h"
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_movegen.h"
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_rules.h"
 
-// **WHAT IT'S DOING:** Opens a namespace scope so related symbols stay organized and do not collide with similarly named code elsewhere.
-// **IN PLAIN ENGLISH:** This creates a labeled section so names are easier to manage and safer to reuse.
 namespace {
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Outcome encoding used for rollout reward accounting.
-// **WHAT IT'S DOING:** Defines a constrained set of named categories that the allocation engine can switch on safely.
-// **IN PLAIN ENGLISH:** This is a controlled vocabulary so the algorithm uses clear, valid options instead of ambiguous integers.
 enum class RolloutOutcome {
   kWin,
   kLoss,
   kUnresolved
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 };
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Internal policy enum for budget-allocation strategy.
-// **WHAT IT'S DOING:** Defines a constrained set of named categories that the allocation engine can switch on safely.
-// **IN PLAIN ENGLISH:** This is a controlled vocabulary so the algorithm uses clear, valid options instead of ambiguous integers.
 enum class AllocationPolicy {
   kEqual,
   kGreedy,
@@ -124,25 +50,13 @@ enum class AllocationPolicy {
   kThompson,
   kTtts,
   kOcba
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 };
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 inline constexpr double kTieTolerance = 1e-12;
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Posterior diagnostics are Monte Carlo approximations and remain deterministic
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // under a fixed seed because they use the same local RNG stream.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 inline constexpr int kPosteriorDiagnosticDraws = 512;
 
-// **WHAT IT'S DOING:** Defines a structured record used to carry related simulation or posterior fields together.
-// **IN PLAIN ENGLISH:** This is a named container that keeps related numbers grouped so downstream summaries stay coherent.
 struct CollapsedCandidate {
   // Board after applying representative legal sequence.
   backgammonr::BoardState board_after{};
@@ -152,12 +66,8 @@ struct CollapsedCandidate {
   int acting_player{1};
   // Number of equivalent sequences collapsed into this state.
   int n_equivalent{1};
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 };
 
-// **WHAT IT'S DOING:** Defines a structured record used to carry related simulation or posterior fields together.
-// **IN PLAIN ENGLISH:** This is a named container that keeps related numbers grouped so downstream summaries stay coherent.
 struct AllocationTraceRow {
   // Snapshot metadata.
   int checkpoint{0};
@@ -177,28 +87,18 @@ struct AllocationTraceRow {
   double lower_95{0.0};
   double upper_95{1.0};
   double selection_score{0.5};
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 };
 
-// **WHAT IT'S DOING:** Defines a structured record used to carry related simulation or posterior fields together.
-// **IN PLAIN ENGLISH:** This is a named container that keeps related numbers grouped so downstream summaries stay coherent.
 struct ForcedRollSchedule {
   // Up to two pre-scheduled rolls for stratified dice modes.
   std::array<backgammonr::DiceRoll, 2> rolls{};
   int n_rolls{0};
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 };
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 RolloutOutcome outcome_from_turn_result(
     const backgammonr::TurnResult& turn_result,
     const int acting_player);
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 backgammonr::BoardState apply_sequence_without_full_validation(
     const backgammonr::BoardState& board,
     const backgammonr::MoveSequence& sequence) {
@@ -210,26 +110,16 @@ backgammonr::BoardState apply_sequence_without_full_validation(
   }
   out.turn = -sequence.player;
   return out;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Lightweight random turn helper used inside rollout loop.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 void play_random_turn_lightweight(
     backgammonr::BoardState& board,
     const backgammonr::DiceRoll& roll,
     std::mt19937& rng) {
   (void) backgammonr::play_random_turn_rollout_fast(board, roll, rng);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Creates a Mersenne Twister random-number generator used for reproducible stochastic simulation.
-// **IN PLAIN ENGLISH:** This is the randomness engine that drives rollouts and posterior sampling.
 std::mt19937 init_rng(const int seed, const bool use_seed) {
   std::mt19937 rng;
 
@@ -244,12 +134,8 @@ std::mt19937 init_rng(const int seed, const bool use_seed) {
   }
 
   return rng;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 double outcome_reward(const RolloutOutcome outcome, const backgammonr::RolloutConfig& config) {
   // Map terminal outcome to Bernoulli-style reward with unresolved fallback.
   if (outcome == RolloutOutcome::kWin) {
@@ -261,12 +147,8 @@ double outcome_reward(const RolloutOutcome outcome, const backgammonr::RolloutCo
   }
 
   return config.unresolved_value;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 RolloutOutcome single_rollout_outcome(
     const backgammonr::BoardState& board_after,
     const int acting_player,
@@ -352,12 +234,8 @@ RolloutOutcome single_rollout_outcome(
   return rollout_result.winner == acting_player
       ? RolloutOutcome::kWin
       : RolloutOutcome::kLoss;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 void update_summary(
     backgammonr::ActionEvaluationSummary& summary,
     const RolloutOutcome outcome,
@@ -377,12 +255,8 @@ void update_summary(
   // Conjugate Beta-Bernoulli posterior update.
   summary.alpha += reward;
   summary.beta += (1.0 - reward);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 double sample_beta_distribution(const double alpha, const double beta, std::mt19937& rng) {
   if (alpha <= 0.0 || beta <= 0.0) {
     throw std::range_error("Beta posterior parameters must be positive.");
@@ -398,12 +272,8 @@ double sample_beta_distribution(const double alpha, const double beta, std::mt19
   }
 
   return x / (x + y);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 AllocationPolicy parse_allocation_policy(const std::string& canonical_method) {
   // Map canonical method string to internal switch enum.
   if (canonical_method == "equal") {
@@ -426,12 +296,8 @@ AllocationPolicy parse_allocation_policy(const std::string& canonical_method) {
   }
 
   throw std::range_error("Unsupported allocation method.");
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 bool score_beats_incumbent(
     const double score,
     const int allocation_count,
@@ -449,12 +315,8 @@ bool score_beats_incumbent(
   }
 
   return false;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::uint32_t stable_rollout_seed(
     const std::uint32_t base_seed,
     const int sample_index,
@@ -468,12 +330,8 @@ std::uint32_t stable_rollout_seed(
   x *= 0xc2b2ae35U;
   x ^= x >> 16;
   return x;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Declares an immutable value to make intent explicit and prevent accidental mutation.
-// **IN PLAIN ENGLISH:** This locks a value so it cannot be changed later by mistake.
 const std::vector<backgammonr::DiceRoll>& unique_unordered_rolls() {
   // Lazily initialize 21 unordered roll outcomes (1-1, 1-2, ..., 6-6).
   static const std::vector<backgammonr::DiceRoll> outcomes = []() {
@@ -487,12 +345,8 @@ const std::vector<backgammonr::DiceRoll>& unique_unordered_rolls() {
     return out;
   }();
   return outcomes;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 ForcedRollSchedule scheduled_forced_rolls(
     const std::string& dice_mode,
     const int sample_index,
@@ -528,12 +382,8 @@ ForcedRollSchedule scheduled_forced_rolls(
   }
 
   throw std::range_error("Unsupported dice stratification mode.");
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 RolloutOutcome outcome_from_turn_result(
     const backgammonr::TurnResult& turn_result,
     const int acting_player) {
@@ -541,12 +391,8 @@ RolloutOutcome outcome_from_turn_result(
     return RolloutOutcome::kUnresolved;
   }
   return turn_result.winner == acting_player ? RolloutOutcome::kWin : RolloutOutcome::kLoss;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Defines a structured record used to carry related simulation or posterior fields together.
-// **IN PLAIN ENGLISH:** This is a named container that keeps related numbers grouped so downstream summaries stay coherent.
 struct BoardStateKey {
   // Hashable canonical board representation for candidate deduplication.
   std::array<int, backgammonr::kNumPoints> points{};
@@ -560,12 +406,8 @@ struct BoardStateKey {
         bar == other.bar &&
         off == other.off;
   }
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 };
 
-// **WHAT IT'S DOING:** Defines a structured record used to carry related simulation or posterior fields together.
-// **IN PLAIN ENGLISH:** This is a named container that keeps related numbers grouped so downstream summaries stay coherent.
 struct BoardStateKeyHash {
   std::size_t operator()(const BoardStateKey& key) const {
     std::size_t h = static_cast<std::size_t>(key.turn * 1315423911U);
@@ -582,12 +424,8 @@ struct BoardStateKeyHash {
 
     return h;
   }
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 };
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 BoardStateKey board_state_key(const backgammonr::BoardState& board) {
   // Copy board fields into fixed key struct for unordered_map lookup.
   BoardStateKey key;
@@ -596,12 +434,8 @@ BoardStateKey board_state_key(const backgammonr::BoardState& board) {
   key.off = board.off;
   key.turn = board.turn;
   return key;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::vector<CollapsedCandidate> collapse_equivalent_candidates(
     const backgammonr::BoardState& board,
     const std::vector<backgammonr::MoveSequence>& legal_moves) {
@@ -609,7 +443,6 @@ std::vector<CollapsedCandidate> collapse_equivalent_candidates(
   // different legal move sequences that end in the same resulting board state.
   // This avoids spending duplicate rollout budget on strategically identical
   // outcomes.
-  // **IN PLAIN ENGLISH:** If two move strings land on the same board, we treat
   // them as one option so simulation time is not wasted repeating equivalent work.
   // Collapse moves that lead to identical board states.
   std::vector<CollapsedCandidate> collapsed;
@@ -640,12 +473,8 @@ std::vector<CollapsedCandidate> collapse_equivalent_candidates(
   }
 
   return collapsed;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 void compute_posterior_diagnostics(
     std::vector<backgammonr::ActionEvaluationSummary>& summaries,
     std::mt19937& rng) {
@@ -653,7 +482,6 @@ void compute_posterior_diagnostics(
   // posterior draws:
   // 1) `prob_best`: how often each candidate wins a posterior draw tournament.
   // 2) `posterior_expected_regret`: average gap to the sampled best value.
-  // **IN PLAIN ENGLISH:** We repeatedly "simulate what might be true" under
   // current uncertainty, then count how often each move looks best and how much
   // value is lost if we picked a non-best move in those hypothetical worlds.
   // Monte Carlo posterior diagnostics (probability best + expected regret).
@@ -692,12 +520,8 @@ void compute_posterior_diagnostics(
     summaries[i].prob_best = best_count[i] / denom;
     summaries[i].posterior_expected_regret = regret_sum[i] / denom;
   }
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 void finalize_summaries(
     std::vector<backgammonr::ActionEvaluationSummary>& summaries,
     const AllocationPolicy policy,
@@ -766,12 +590,8 @@ void finalize_summaries(
     summaries[i].prob_best = NA_REAL;
     summaries[i].posterior_expected_regret = NA_REAL;
   }
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 void update_interim_summary_fields(
     std::vector<backgammonr::ActionEvaluationSummary>& summaries,
     const AllocationPolicy policy,
@@ -830,12 +650,8 @@ void update_interim_summary_fields(
       summaries[i].selection_score = posterior_mean[i] + bonus[i];
     }
   }
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 int current_leader_index(const std::vector<backgammonr::ActionEvaluationSummary>& summaries) {
   // Pick current leader by estimate, tie-break by higher sample count.
   if (summaries.empty()) {
@@ -856,12 +672,8 @@ int current_leader_index(const std::vector<backgammonr::ActionEvaluationSummary>
   }
 
   return leader;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 void append_trace_snapshot(
     std::vector<AllocationTraceRow>& trace_rows,
     std::vector<backgammonr::ActionEvaluationSummary>& summaries,
@@ -897,19 +709,14 @@ void append_trace_snapshot(
     row.selection_score = summary.selection_score;
     trace_rows.push_back(row);
   }
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 arma::vec ocba_target_allocations(
     const std::vector<backgammonr::ActionEvaluationSummary>& summaries,
     const int next_total_allocations) {
   // **WHAT IT'S DOING (DETAILED):** Computes a continuous OCBA-inspired target
   // allocation profile from posterior means and posterior standard deviations.
   // Arms with smaller mean gaps and/or larger uncertainty get larger target mass.
-  // **IN PLAIN ENGLISH:** Give extra simulations to moves that are both promising
   // and still uncertain, because those are the ones that can still change the
   // final recommendation.
   // OCBA target-allocation approximation from posterior means/variances.
@@ -972,12 +779,8 @@ arma::vec ocba_target_allocations(
 
   target = ratio / ratio_sum * static_cast<double>(next_total_allocations);
   return target;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 int choose_next_candidate(
     const std::vector<backgammonr::ActionEvaluationSummary>& summaries,
     const AllocationPolicy policy,
@@ -987,7 +790,6 @@ int choose_next_candidate(
   // **WHAT IT'S DOING (DETAILED):** Central policy switch for one-step budget
   // allocation. Given the current posterior state, this chooses exactly one
   // candidate to receive the next rollout sample.
-  // **IN PLAIN ENGLISH:** This is the "who gets the next simulation?" decision.
   // Different methods answer that question differently (equal, UCB, Thompson,
   // TTTS, OCBA), but they all pass through this function.
   // Policy-specific next-arm selection in a fixed-budget simulation problem.
@@ -1032,7 +834,6 @@ int choose_next_candidate(
     // **WHAT IT'S DOING (DETAILED):** Top-Two Thompson Sampling (TTTS):
     // sample a first winner I, then with probability beta play I, otherwise
     // sample until we get a distinct winner J and play J.
-    // **IN PLAIN ENGLISH:** TTTS deliberately gives some budget to the runner-up
     // under posterior uncertainty so we do not over-commit too early.
     // Top-Two Thompson Sampling:
     // 1) draw posterior sample and pick top action I,
@@ -1111,12 +912,8 @@ int choose_next_candidate(
   }
 
   return best_index;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::vector<backgammonr::ActionEvaluationSummary> evaluate_with_optional_trace(
     const backgammonr::BoardState& board,
     const std::vector<backgammonr::MoveSequence>& legal_moves,
@@ -1132,7 +929,6 @@ std::vector<backgammonr::ActionEvaluationSummary> evaluate_with_optional_trace(
   // Phase C: optional warm-start allocations for adaptive methods.
   // Phase D: main adaptive allocation loop until budget is exhausted.
   // Phase E: finalize posterior summaries/diagnostics and return.
-  // **IN PLAIN ENGLISH:** This is the main experiment engine that spends a
   // limited simulation budget and records how estimates and uncertainty evolve.
   // Core allocation engine used by all public wrappers.
   backgammonr::validate_rollout_config(config);
@@ -1251,23 +1047,13 @@ std::vector<backgammonr::ActionEvaluationSummary> evaluate_with_optional_trace(
 
   finalize_summaries(summaries, policy, config, rng);
   return summaries;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 }  // namespace
 
-// **WHAT IT'S DOING:** Opens a namespace scope so related symbols stay organized and do not collide with similarly named code elsewhere.
-// **IN PLAIN ENGLISH:** This creates a labeled section so names are easier to manage and safer to reuse.
 namespace backgammonr {
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Supported public method identifiers (including compatibility aliases).
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 bool is_supported_allocation_method(const std::string& method) {
   return method == "equal" ||
       method == "greedy" ||
@@ -1282,23 +1068,15 @@ bool is_supported_allocation_method(const std::string& method) {
       method == "ocba_rollout" ||
       method == "thompson_rollout" ||
       method == "ttts_rollout";
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 void validate_allocation_method(const std::string& method) {
   if (!is_supported_allocation_method(method)) {
     throw std::range_error(
         "`method` must be one of \"equal\", \"greedy\", \"ucb\", \"ocba\", \"thompson\", \"ttts\", \"rollout\", \"equal_rollout\", \"greedy_rollout\", \"ucb_rollout\", \"ocba_rollout\", \"thompson_rollout\", or \"ttts_rollout\".");
   }
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::string canonicalize_allocation_method(const std::string& method) {
   // Canonicalize aliases so downstream switches only handle one spelling.
   validate_allocation_method(method);
@@ -1322,12 +1100,8 @@ std::string canonicalize_allocation_method(const std::string& method) {
   }
 
   return "thompson";
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::vector<ActionEvaluationSummary> evaluate_move_sequences_with_allocation(
     const BoardState& board,
     const std::vector<MoveSequence>& legal_moves,
@@ -1343,12 +1117,8 @@ std::vector<ActionEvaluationSummary> evaluate_move_sequences_with_allocation(
       rng,
       1,
       nullptr);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 int best_candidate_index(const std::vector<ActionEvaluationSummary>& summaries) {
   // Pick best by posterior estimate, with deterministic tie-breaks.
   if (summaries.empty()) {
@@ -1383,12 +1153,8 @@ int best_candidate_index(const std::vector<ActionEvaluationSummary>& summaries) 
   }
 
   return best_index;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 MoveSequence choose_move_sequence_with_allocation(
     const BoardState& board,
     const std::vector<MoveSequence>& legal_moves,
@@ -1414,12 +1180,8 @@ MoveSequence choose_move_sequence_with_allocation(
   }
 
   return legal_moves[representative_move_index];
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::DataFrame action_evaluation_summaries_to_data_frame(
     const std::vector<ActionEvaluationSummary>& summaries) {
   // Columnar conversion for R-side data-frame consumption.
@@ -1478,16 +1240,10 @@ Rcpp::DataFrame action_evaluation_summaries_to_data_frame(
       Rcpp::_["posterior_expected_regret"] = posterior_expected_regret,
       Rcpp::_["selection_score"] = selection_score,
       Rcpp::_["stringsAsFactors"] = false);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 }  // namespace backgammonr
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::DataFrame allocation_trace_rows_to_data_frame(
     const std::vector<AllocationTraceRow>& trace_rows) {
   // Columnar conversion for optional trace output.
@@ -1546,15 +1302,9 @@ Rcpp::DataFrame allocation_trace_rows_to_data_frame(
       Rcpp::_["upper_95"] = upper_95,
       Rcpp::_["selection_score"] = selection_score,
       Rcpp::_["stringsAsFactors"] = false);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_allocation_evaluate(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -1609,15 +1359,9 @@ Rcpp::List bg_cpp_allocation_evaluate(
       Rcpp::_["method"] = Rcpp::CharacterVector::create(
           backgammonr::canonicalize_allocation_method(method)),
       Rcpp::_["total_budget"] = Rcpp::IntegerVector::create(total_budget));
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_allocation_evaluate_trace(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -1679,15 +1423,9 @@ Rcpp::List bg_cpp_allocation_evaluate_trace(
       Rcpp::_["method"] = Rcpp::CharacterVector::create(
           backgammonr::canonicalize_allocation_method(method)),
       Rcpp::_["total_budget"] = Rcpp::IntegerVector::create(total_budget));
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_profile_rollout_runtime(
     const Rcpp::List& board,
     const Rcpp::List& roll,
@@ -1793,6 +1531,4 @@ Rcpp::List bg_cpp_profile_rollout_runtime(
       Rcpp::_["total_budget"] = Rcpp::IntegerVector::create(total_budget),
       Rcpp::_["rollout_policy"] = Rcpp::CharacterVector::create(rollout_policy),
       Rcpp::_["max_rollout_turns"] = Rcpp::IntegerVector::create(max_rollout_turns));
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }

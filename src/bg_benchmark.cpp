@@ -1,77 +1,31 @@
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_benchmark.h"
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // This translation unit contains benchmark-oriented orchestration for the
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // rollout/statistical APIs. The game engine produces stochastic outcomes;
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // this file standardizes how we compare methods on shared cases and collect
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // reproducible runtime + decision-quality summaries.
 
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <Rcpp.h>
 
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <chrono>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <cstdint>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <functional>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <optional>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <random>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <sstream>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <stdexcept>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <string>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <vector>
 
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_game.h"
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_move.h"
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_movegen.h"
 
-// **WHAT IT'S DOING:** Opens a namespace scope so related symbols stay organized and do not collide with similarly named code elsewhere.
-// **IN PLAIN ENGLISH:** This creates a labeled section so names are easier to manage and safer to reuse.
 namespace {
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 using Clock = std::chrono::steady_clock;
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Create deterministic/non-deterministic RNG stream.
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Determinism matters for method-vs-method comparability in benchmarks.
-// **WHAT IT'S DOING:** Creates a Mersenne Twister random-number generator used for reproducible stochastic simulation.
-// **IN PLAIN ENGLISH:** This is the randomness engine that drives rollouts and posterior sampling.
 std::mt19937 init_rng(const int seed, const bool use_seed) {
   std::mt19937 rng;
 
@@ -86,18 +40,10 @@ std::mt19937 init_rng(const int seed, const bool use_seed) {
   }
 
   return rng;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Derive reproducible child RNG streams from case/method labels so each
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // benchmark component can be replayed exactly.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::uint32_t stable_stream_seed(
     const std::uint32_t base_seed,
     const std::string& case_id,
@@ -105,28 +51,16 @@ std::uint32_t stable_stream_seed(
     const std::string& stream_label) {
   const std::size_t hashed = std::hash<std::string>{}(case_id + "::" + method + "::" + stream_label);
   return static_cast<std::uint32_t>(hashed ^ static_cast<std::size_t>(base_seed));
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Small timing helper used for all benchmark runtime reporting.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 double elapsed_seconds(
     const std::chrono::time_point<Clock>& start,
     const std::chrono::time_point<Clock>& end) {
   return std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Parse R list of scripted rolls into internal DiceRoll objects.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::vector<backgammonr::DiceRoll> parse_roll_vector(const Rcpp::List& rolls) {
   std::vector<backgammonr::DiceRoll> out;
   out.reserve(rolls.size());
@@ -143,39 +77,21 @@ std::vector<backgammonr::DiceRoll> parse_roll_vector(const Rcpp::List& rolls) {
   }
 
   return out;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Convenience check for optional fields in list-like case objects.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 bool has_named_element(const Rcpp::List& x, const char* name) {
   return x.containsElementNamed(name);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Default case IDs are deterministic and human-readable.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::string default_case_id(const int index) {
   std::ostringstream oss;
   oss << "case_" << index;
   return oss.str();
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Parse optional case ID while enforcing scalar/non-missing semantics.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::string parse_case_id(const Rcpp::List& case_list, const int index) {
   if (!has_named_element(case_list, "case_id")) {
     return default_case_id(index);
@@ -201,15 +117,9 @@ std::string parse_case_id(const Rcpp::List& case_list, const int index) {
   }
 
   return parsed;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Convert chosen move sequence into 1-based index in legal move table.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 int chosen_index_in_legal_moves(
     const backgammonr::MoveSequence& chosen,
     const std::vector<backgammonr::MoveSequence>& legal_moves) {
@@ -220,24 +130,12 @@ int chosen_index_in_legal_moves(
   }
 
   throw std::range_error("Internal error: chosen move was not found in the legal-move set.");
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Method-selection helper used by move-evaluator benchmark.
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // The key behavior is RNG stream isolation:
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - each case/method/stream_label gets a stable child stream
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - this avoids accidental cross-method coupling.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::optional<backgammonr::MoveSequence> choose_move_for_benchmark(
     const backgammonr::BoardState& board,
     const std::vector<backgammonr::MoveSequence>& legal_moves,
@@ -258,15 +156,9 @@ std::optional<backgammonr::MoveSequence> choose_move_for_benchmark(
   }
 
   return backgammonr::choose_move_sequence(board, legal_moves, method, rng_ptr, rollout_config);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Attach runtime-derived throughput columns to summary data frame.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::DataFrame add_runtime_columns_to_summary(const Rcpp::DataFrame& summary, const double runtime_seconds, const int n_games) {
   Rcpp::List out(summary);
   out.push_back(Rcpp::NumericVector::create(runtime_seconds), "runtime_seconds");
@@ -279,23 +171,13 @@ Rcpp::DataFrame add_runtime_columns_to_summary(const Rcpp::DataFrame& summary, c
   out.attr("class") = summary.attr("class");
   out.attr("row.names") = summary.attr("row.names");
   return Rcpp::DataFrame(out);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 }  // namespace
 
-// **WHAT IT'S DOING:** Opens a namespace scope so related symbols stay organized and do not collide with similarly named code elsewhere.
-// **IN PLAIN ENGLISH:** This creates a labeled section so names are easier to manage and safer to reuse.
 namespace backgammonr {
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Benchmark random-roll matchup end-to-end and keep wall-clock runtime.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 MatchupBenchmarkResult benchmark_matchup_random(
     const BoardState& initial_board,
     const int n_games,
@@ -319,15 +201,9 @@ MatchupBenchmarkResult benchmark_matchup_random(
   out.simulation = simulation;
   out.runtime_seconds = elapsed_seconds(start, end);
   return out;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Benchmark scripted-roll matchup end-to-end and keep wall-clock runtime.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 MatchupBenchmarkResult benchmark_matchup_with_rolls(
     const BoardState& initial_board,
     const std::vector<DiceRoll>& rolls,
@@ -353,18 +229,10 @@ MatchupBenchmarkResult benchmark_matchup_with_rolls(
   out.simulation = simulation;
   out.runtime_seconds = elapsed_seconds(start, end);
   return out;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Parse list of benchmark cases:
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // each case must provide (board, roll), and may provide case_id.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::vector<MoveBenchmarkCase> parse_move_benchmark_cases(const Rcpp::List& cases) {
   std::vector<MoveBenchmarkCase> out;
   out.reserve(cases.size());
@@ -402,21 +270,11 @@ std::vector<MoveBenchmarkCase> parse_move_benchmark_cases(const Rcpp::List& case
   }
 
   return out;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Core move-evaluator benchmark:
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // for each case and each method, choose one move and compare to optional
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // reference method choice on the same legal-action set.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 MoveBenchmarkResult benchmark_move_evaluators(
     const std::vector<MoveBenchmarkCase>& cases,
     const std::vector<std::string>& methods,
@@ -429,7 +287,6 @@ MoveBenchmarkResult benchmark_move_evaluators(
   // Key design choice: if `reference_method` is provided, we compute its choice
   // once per case (not once per method row) and compare each tested method to
   // that fixed reference choice.
-  // **IN PLAIN ENGLISH:** Everybody is graded on the same test questions, and
   // the answer key is generated once per question so the comparison is fair.
   validate_rollout_config(method_rollout_config);
   validate_rollout_config(reference_rollout_config);
@@ -531,15 +388,9 @@ MoveBenchmarkResult benchmark_move_evaluators(
   }
 
   return out;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Convert matchup benchmark object to R list and append runtime metadata.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List matchup_benchmark_result_to_list(const MatchupBenchmarkResult& result) {
   Rcpp::List out = matchup_simulation_result_to_list(result.simulation);
   const Rcpp::DataFrame summary(out["summary"]);
@@ -549,15 +400,9 @@ Rcpp::List matchup_benchmark_result_to_list(const MatchupBenchmarkResult& result
   settings.push_back(Rcpp::NumericVector::create(result.runtime_seconds), "runtime_seconds");
   out["settings"] = settings;
   return out;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Convert row-level move benchmark records to R data frame.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::DataFrame move_benchmark_rows_to_data_frame(const MoveBenchmarkResult& result) {
   const int n = static_cast<int>(result.rows.size());
   Rcpp::CharacterVector case_id(n);
@@ -587,15 +432,9 @@ Rcpp::DataFrame move_benchmark_rows_to_data_frame(const MoveBenchmarkResult& res
       Rcpp::_["match_reference"] = match_reference,
       Rcpp::_["runtime_seconds"] = runtime_seconds,
       Rcpp::_["stringsAsFactors"] = false);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Aggregate move benchmark rows by method into compact summary metrics.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::DataFrame move_benchmark_summary_to_data_frame(const MoveBenchmarkResult& result) {
   const int n_methods = static_cast<int>(result.methods.size());
   Rcpp::CharacterVector method(n_methods);
@@ -653,15 +492,9 @@ Rcpp::DataFrame move_benchmark_summary_to_data_frame(const MoveBenchmarkResult& 
       Rcpp::_["mean_runtime_seconds"] = mean_runtime_seconds,
       Rcpp::_["best_move_match_rate"] = best_move_match_rate,
       Rcpp::_["stringsAsFactors"] = false);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Package row-level + summary-level benchmark outputs into one R list.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List move_benchmark_result_to_list(
     const MoveBenchmarkResult& result,
     const RolloutConfig& method_rollout_config,
@@ -680,19 +513,11 @@ Rcpp::List move_benchmark_result_to_list(
           Rcpp::_["reference_rollout_budget"] = Rcpp::IntegerVector::create(reference_rollout_config.budget),
           Rcpp::_["reference_rollout_policy"] = Rcpp::CharacterVector::create(reference_rollout_config.policy),
           Rcpp::_["reference_max_rollout_turns"] = Rcpp::IntegerVector::create(reference_rollout_config.max_turns)));
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 }  // namespace backgammonr
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_benchmark_matchup_random(
     const Rcpp::List& board,
     const int n_games,
@@ -718,15 +543,9 @@ Rcpp::List bg_cpp_benchmark_matchup_random(
           player1_selection,
           player2_selection,
           rollout_config));
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_benchmark_matchup_scripted(
     const Rcpp::List& board,
     const Rcpp::List& rolls,
@@ -763,15 +582,9 @@ Rcpp::List bg_cpp_benchmark_matchup_scripted(
           player2_selection,
           rng_ptr,
           rollout_config));
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_benchmark_move_evaluators(
     const Rcpp::List& cases,
     const std::vector<std::string>& methods,
@@ -807,6 +620,4 @@ Rcpp::List bg_cpp_benchmark_move_evaluators(
           rng),
       method_rollout_config,
       reference_rollout_config);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }

@@ -1,73 +1,29 @@
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_thompson_rollout.h"
 
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <cstdint>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <random>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <stdexcept>
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include <vector>
 
-// **WHAT IT'S DOING:** Loads a required C++ header so this file can use needed data structures, math utilities, or package interfaces.
-// **IN PLAIN ENGLISH:** Think of this like bringing the right tools into the room before starting the analysis work.
 #include "bg_allocation.h"
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // -----------------------------------------------------------------------------
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // bg_thompson_rollout.cpp
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 //
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Thompson-specific rollout wrappers.
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 //
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Why this file exists:
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - R users often want a dedicated "Thompson rollout" entry point.
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - Internally, we still route to the common allocation engine in
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 //   bg_allocation.cpp to avoid duplicated logic.
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - Here, we only fix method = "thompson" and shape the returned fields.
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // -----------------------------------------------------------------------------
 
-// **WHAT IT'S DOING:** Opens a namespace scope so related symbols stay organized and do not collide with similarly named code elsewhere.
-// **IN PLAIN ENGLISH:** This creates a labeled section so names are easier to manage and safer to reuse.
 namespace {
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Construct RNG for this call.
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - Deterministic when a seed is provided.
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // - Otherwise seeded from entropy source.
-// **WHAT IT'S DOING:** Creates a Mersenne Twister random-number generator used for reproducible stochastic simulation.
-// **IN PLAIN ENGLISH:** This is the randomness engine that drives rollouts and posterior sampling.
 std::mt19937 init_rng(const int seed, const bool use_seed) {
   std::mt19937 rng;
 
@@ -82,26 +38,14 @@ std::mt19937 init_rng(const int seed, const bool use_seed) {
   }
 
   return rng;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 }  // namespace
 
-// **WHAT IT'S DOING:** Opens a namespace scope so related symbols stay organized and do not collide with similarly named code elsewhere.
-// **IN PLAIN ENGLISH:** This creates a labeled section so names are easier to manage and safer to reuse.
 namespace backgammonr {
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Evaluate legal moves with Thompson allocation and return a Thompson-focused
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // compact structure.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 std::vector<ThompsonRolloutMoveSummary> evaluate_thompson_rollout_move_sequences(
     const BoardState& board,
     const std::vector<MoveSequence>& legal_moves,
@@ -111,7 +55,6 @@ std::vector<ThompsonRolloutMoveSummary> evaluate_thompson_rollout_move_sequences
   // 1) Call the shared allocation engine with method fixed to Thompson sampling.
   // 2) Receive generic action summaries (shared across all allocation methods).
   // 3) Project those fields into a Thompson-specific compact summary struct.
-  // **IN PLAIN ENGLISH:** This is a Thompson-themed view of the common evaluator.
   // Shared engine call with canonical method label = "thompson".
   const std::vector<ActionEvaluationSummary> summaries =
       evaluate_move_sequences_with_allocation(board, legal_moves, "thompson", config, rng);
@@ -142,15 +85,9 @@ std::vector<ThompsonRolloutMoveSummary> evaluate_thompson_rollout_move_sequences
   }
 
   return out;
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Choose a single move with Thompson allocation.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 MoveSequence choose_thompson_rollout_move_sequence(
     const BoardState& board,
     const std::vector<MoveSequence>& legal_moves,
@@ -158,23 +95,15 @@ MoveSequence choose_thompson_rollout_move_sequence(
     std::mt19937& rng) {
   // **WHAT IT'S DOING (DETAILED):** Delegates to the shared chooser while
   // pinning method = `"thompson"`.
-  // **IN PLAIN ENGLISH:** Ask the allocation engine for one Thompson-chosen move.
   return choose_move_sequence_with_allocation(board, legal_moves, "thompson", config, rng);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // Convert Thompson summaries to an R data.frame.
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::DataFrame thompson_rollout_move_summaries_to_data_frame(
     const std::vector<ThompsonRolloutMoveSummary>& summaries) {
   // **WHAT IT'S DOING (DETAILED):** Marshals C++ Thompson summary rows into an
   // R data frame with explicit columns for allocation counts, outcomes, and
   // posterior parameters.
-  // **IN PLAIN ENGLISH:** Converts internal Thompson results into an R table.
   const int n = static_cast<int>(summaries.size());
   Rcpp::IntegerVector candidate_index(n);
   Rcpp::IntegerVector allocation_count(n);
@@ -209,19 +138,11 @@ Rcpp::DataFrame thompson_rollout_move_summaries_to_data_frame(
       Rcpp::_["posterior_mean"] = posterior_mean,
       Rcpp::_["empirical_win_rate"] = empirical_win_rate,
       Rcpp::_["stringsAsFactors"] = false);
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 }  // namespace backgammonr
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::DataFrame bg_cpp_thompson_rollout_move_evaluate(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -236,7 +157,6 @@ Rcpp::DataFrame bg_cpp_thompson_rollout_move_evaluate(
   // - Initialize RNG stream (seeded or random-device).
   // - Run Thompson allocation evaluator.
   // - Return standardized action-evaluation table.
-  // **IN PLAIN ENGLISH:** Main Rcpp entry for "evaluate legal moves with Thompson."
   // Parse R objects into C++ engine structures.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::MoveSequence> parsed_moves =
@@ -254,15 +174,9 @@ Rcpp::DataFrame bg_cpp_thompson_rollout_move_evaluate(
           "thompson",
           config,
           rng));
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
 
-// **WHAT IT'S DOING:** Documents intent for the next code line or block so behavior is easier to audit and maintain.
-// **IN PLAIN ENGLISH:** This sentence is there to explain why the next step exists.
 // [[Rcpp::export]]
-// **WHAT IT'S DOING:** Performs the next low-level step in the statistical allocation pipeline.
-// **IN PLAIN ENGLISH:** This is one small instruction that helps turn noisy rollout outcomes into stable decision summaries.
 Rcpp::List bg_cpp_thompson_rollout_move_choice(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -273,7 +187,6 @@ Rcpp::List bg_cpp_thompson_rollout_move_choice(
     const bool use_seed) {
   // **WHAT IT'S DOING (DETAILED):** Same parsing/config/RNG setup as the
   // evaluate wrapper, but returns only the selected move sequence.
-  // **IN PLAIN ENGLISH:** Main Rcpp entry for "pick one Thompson move."
   // Parse R objects into C++ engine structures.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::MoveSequence> parsed_moves =
@@ -290,6 +203,4 @@ Rcpp::List bg_cpp_thompson_rollout_move_choice(
           "thompson",
           config,
           rng));
-// **WHAT IT'S DOING:** Ends the current block scope and returns to the outer context.
-// **IN PLAIN ENGLISH:** This closes the section that just finished running.
 }
