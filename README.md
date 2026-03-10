@@ -4,6 +4,24 @@
 
 The package is not a strong-play backgammon AI package. Its core focus is best-action identification under simulation noise.
 
+
+NOTE: The main statistical and simulation logic of the project lives in a few C++ files in the src/ folder: bg_allocation.cpp, bg_rollout.cpp, bg_thompson_rollout.cpp, bg_simulation.cpp, and bg_benchmark.cpp. These are really the core of the project. They handle the Monte Carlo simulation, rollout evaluation, adaptive sampling methods, and the benchmarking framework used to compare different approaches. These files are also heavily commented, which makes it fairly straightforward to follow the logic of how simulations are generated, how rollouts are evaluated, and how the allocation strategies are applied.
+
+Overall these five files contain the core statistical and simulation logic of the project. Many of the other files in the repository, particularly those related to plotting, board visualization, and parts of the game mechanics, were largely helped along by generative AI during development. Because of that, those files will need additional inspection and cleanup to verify correctness, simplify the structure, and remove redundancy. The focus so far has been making sure the statistical allocation and simulation framework is working properly, and those components are primarily implemented in the C++ files described above.
+
+bg_allocation.cpp is the most important file from the statistical side. This is where the allocation logic is implemented. The goal of this file is to determine how a fixed simulation budget should be distributed across candidate moves. Instead of dividing simulations evenly, the code supports several strategies including equal allocation, greedy allocation based on posterior means, UCB style rules, Thompson sampling, top two Thompson sampling, and an OCBA style allocation rule. The file first generates the legal moves and collapses moves that lead to the same resulting board state so that simulation effort is not wasted on equivalent positions. For each candidate move the code runs rollouts, which simulate the rest of the game starting from that position. Outcomes are tracked using a Beta Bernoulli framework where each move maintains alpha and beta parameters representing a posterior distribution over its win probability. These posterior estimates are then used by the allocation rules to decide which move should receive the next simulation.
+
+bg_rollout.cpp provides a simpler interface for running traditional rollout evaluations. In this case the allocation method is fixed to equal allocation, so each candidate move receives roughly the same number of simulations. Rather than implementing a completely separate rollout system, this file simply calls the allocation engine with the equal allocation option. Its main role is to expose cleaner user facing functions for evaluating moves and returning summaries such as win rates and simulation counts.
+
+bg_thompson_rollout.cpp works in a similar way but focuses on Thompson sampling. Instead of allocating simulations evenly, it uses Thompson sampling to determine which candidate move should receive the next rollout. The underlying Thompson sampling logic still lives in bg_allocation.cpp; this file mainly acts as a wrapper that exposes a simpler interface for running Thompson based rollout experiments and returning the most relevant statistics.
+
+bg_simulation.cpp handles full game simulation. Instead of evaluating a single move, this file simulates complete backgammon games between two policies. Each turn a player selects a move according to its policy, which might be random play, rollout based decision making, or Thompson sampling. The file includes functions for simulating individual games and for running batches of many games. After simulations are complete the results are aggregated into summaries such as win rates, number of turns, and whether games reached the turn limit.
+
+bg_benchmark.cpp provides a framework for running structured experiments that compare different methods. It supports evaluating decision methods on multiple positions as well as running repeated game simulations between policies. One important feature is that it carefully manages random number seeds so experiments are reproducible and comparisons between methods are fair. The benchmarking code records which moves each method selects, how often those selections match a reference estimate, and how long each method takes to run.
+
+
+
+
 ## Core Research Question
 
 For one decision instance
