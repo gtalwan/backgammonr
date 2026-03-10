@@ -19,6 +19,7 @@ src/*.dylib
 # Render/build outputs
 vignettes/*.html
 vignettes/*.pdf
+!vignettes/06_main_question_example_quick.pdf
 tests/testthat/Rplots.pdf
 
 # Package build artifacts
