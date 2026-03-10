@@ -1307,10 +1307,10 @@ Rcpp::DataFrame allocation_trace_rows_to_data_frame(
       Rcpp::_["stringsAsFactors"] = false);
 }
 
-// [[Rcpp::export]]
 // Function: bg_cpp_allocation_evaluate
 // Purpose: Rcpp entry point for allocation-method evaluation table.
 // Called by: R wrapper `bg_cpp_allocation_evaluate` via RcppExports.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_allocation_evaluate(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -1367,10 +1367,10 @@ Rcpp::List bg_cpp_allocation_evaluate(
       Rcpp::_["total_budget"] = Rcpp::IntegerVector::create(total_budget));
 }
 
-// [[Rcpp::export]]
 // Function: bg_cpp_allocation_evaluate_trace
 // Purpose: Rcpp entry point for allocation evaluation with trace checkpoints.
 // Called by: R wrapper `bg_cpp_allocation_evaluate_trace` via RcppExports.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_allocation_evaluate_trace(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -1434,11 +1434,11 @@ Rcpp::List bg_cpp_allocation_evaluate_trace(
       Rcpp::_["total_budget"] = Rcpp::IntegerVector::create(total_budget));
 }
 
-// [[Rcpp::export]]
 // Function: bg_cpp_profile_rollout_runtime
 // Purpose: Micro-profile legal-move generation, move application, and rollout
 // phases for runtime diagnostics.
 // Called by: R profiling helper wrappers.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_profile_rollout_runtime(
     const Rcpp::List& board,
     const Rcpp::List& roll,

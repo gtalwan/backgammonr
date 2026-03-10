@@ -525,10 +525,10 @@ Rcpp::List move_benchmark_result_to_list(
 
 }  // namespace backgammonr
 
-// [[Rcpp::export]]
 // Function: bg_cpp_benchmark_matchup_random
 // Purpose: Rcpp entry point for random-dice matchup benchmarking.
 // Called by: R benchmark wrapper in R/benchmarking.R.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_benchmark_matchup_random(
     const Rcpp::List& board,
     const int n_games,
@@ -556,10 +556,10 @@ Rcpp::List bg_cpp_benchmark_matchup_random(
           rollout_config));
 }
 
-// [[Rcpp::export]]
 // Function: bg_cpp_benchmark_matchup_scripted
 // Purpose: Rcpp entry point for scripted-dice matchup benchmarking.
 // Called by: R benchmark wrapper in R/benchmarking.R.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_benchmark_matchup_scripted(
     const Rcpp::List& board,
     const Rcpp::List& rolls,
@@ -598,10 +598,10 @@ Rcpp::List bg_cpp_benchmark_matchup_scripted(
           rollout_config));
 }
 
-// [[Rcpp::export]]
 // Function: bg_cpp_benchmark_move_evaluators
 // Purpose: Rcpp entry point for case-by-case move benchmark across methods.
 // Called by: benchmark_move_evaluators() R wrapper in R/benchmarking.R.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_benchmark_move_evaluators(
     const Rcpp::List& cases,
     const std::vector<std::string>& methods,

@@ -458,11 +458,11 @@ Rcpp::List matchup_simulation_result_to_list(const MatchupSimulationResult& resu
 
 }  // namespace backgammonr
 
-// [[Rcpp::export]]
 // Function: bg_cpp_simulate_matchup_random
 // Purpose: Rcpp entry point for random-dice simulation without explicit rollout
 // policy tuning.
 // Called by: R wrapper `simulate_matchup(..., scripted_rolls = NULL)`.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_simulate_matchup_random(
     const Rcpp::List& board,
     const int n_games,
@@ -487,10 +487,10 @@ Rcpp::List bg_cpp_simulate_matchup_random(
           backgammonr::RolloutConfig()));
 }
 
-// [[Rcpp::export]]
 // Function: bg_cpp_simulate_matchup_scripted
 // Purpose: Rcpp entry point for scripted-dice simulation.
 // Called by: R wrapper `simulate_matchup(..., scripted_rolls = <list>)`.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_simulate_matchup_scripted(
     const Rcpp::List& board,
     const Rcpp::List& rolls,
@@ -525,11 +525,11 @@ Rcpp::List bg_cpp_simulate_matchup_scripted(
           backgammonr::RolloutConfig()));
 }
 
-// [[Rcpp::export]]
 // Function: bg_cpp_simulate_matchup_random_rollout
 // Purpose: Rcpp entry point for random-dice simulation with explicit rollout
 // config fields.
 // Called by: R wrapper path used when rollout knobs are provided.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_simulate_matchup_random_rollout(
     const Rcpp::List& board,
     const int n_games,
@@ -558,11 +558,11 @@ Rcpp::List bg_cpp_simulate_matchup_random_rollout(
           rollout_config));
 }
 
-// [[Rcpp::export]]
 // Function: bg_cpp_simulate_matchup_scripted_rollout
 // Purpose: Rcpp entry point for scripted-dice simulation with explicit rollout
 // config fields.
 // Called by: R scripted simulation wrapper with rollout controls.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_simulate_matchup_scripted_rollout(
     const Rcpp::List& board,
     const Rcpp::List& rolls,

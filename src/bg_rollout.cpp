@@ -212,12 +212,12 @@ Rcpp::DataFrame rollout_move_summaries_to_data_frame(
 
 }  // namespace backgammonr
 
-// [[Rcpp::export]]
 // Function: bg_cpp_rollout_move_evaluate
 // Purpose: Rcpp entry point for equal-rollout move evaluation.
 // Called by: R function `evaluate_actions_equal_rollout()` via RcppExports.
 // Notes: Returns standardized allocation-style table for compatibility with the
 // package's shared print/summary workflow.
+// [[Rcpp::export]]
 Rcpp::DataFrame bg_cpp_rollout_move_evaluate(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -244,11 +244,11 @@ Rcpp::DataFrame bg_cpp_rollout_move_evaluate(
           rng));
 }
 
-// [[Rcpp::export]]
 // Function: bg_cpp_rollout_move_choice
 // Purpose: Rcpp entry point for selecting one equal-rollout move.
 // Called by: R function `choose_action_equal_rollout()` via RcppExports.
 // Notes: Mirrors evaluate wrapper parsing/configuration to keep behavior aligned.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_rollout_move_choice(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,

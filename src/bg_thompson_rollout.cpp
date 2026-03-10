@@ -120,11 +120,11 @@ Rcpp::DataFrame thompson_rollout_move_summaries_to_data_frame(
 
 }  // namespace backgammonr
 
-// [[Rcpp::export]]
 // Function: bg_cpp_thompson_rollout_move_evaluate
 // Purpose: Rcpp entry point for Thompson move evaluation (table output).
 // Called by: R function `evaluate_actions_thompson()` through RcppExports.
 // Notes: Returns standardized action-evaluation table used across methods.
+// [[Rcpp::export]]
 Rcpp::DataFrame bg_cpp_thompson_rollout_move_evaluate(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
@@ -152,11 +152,11 @@ Rcpp::DataFrame bg_cpp_thompson_rollout_move_evaluate(
           rng));
 }
 
-// [[Rcpp::export]]
 // Function: bg_cpp_thompson_rollout_move_choice
 // Purpose: Rcpp entry point for one Thompson-selected move.
 // Called by: R function `choose_action_thompson()` through RcppExports.
 // Notes: Uses same parsing/config pattern as evaluate wrapper for consistency.
+// [[Rcpp::export]]
 Rcpp::List bg_cpp_thompson_rollout_move_choice(
     const Rcpp::List& board,
     const Rcpp::List& legal_moves,
