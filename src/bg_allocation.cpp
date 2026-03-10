@@ -1,5 +1,17 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 #include <RcppArmadillo.h>
+// Core statistical-allocation engine.
+//
+// This file implements the finite-budget sampling logic used across methods:
+// - equal allocation
+// - greedy posterior-mean allocation
+// - UCB-style allocation
+// - Thompson sampling
+// - top-two Thompson sampling (TTTS)
+// - OCBA-style approximate allocation
+//
+// The same engine is reused by multiple wrappers so method comparisons differ
+// by policy choice rather than by duplicated simulation code paths.
 
 #include "bg_allocation.h"
 

@@ -1,4 +1,6 @@
 #include "bg_simulation.h"
+// This translation unit implements the multi-game simulation layer that
+// aggregates per-game stochastic outcomes into study-ready summary tables.
 
 #include <algorithm>
 #include <cstdint>
@@ -331,6 +333,7 @@ MatchupSimulationResult simulate_matchup_random(
     const std::string& player1_selection,
     const std::string& player2_selection,
     const RolloutConfig& rollout_config) {
+  // Validate selector labels and simulation controls before running any game.
   validate_selection(player1_selection);
   validate_selection(player2_selection);
   validate_n_games(n_games);
@@ -374,6 +377,7 @@ MatchupSimulationResult simulate_matchup_with_rolls(
     const std::string& player2_selection,
     std::mt19937* rng,
     const RolloutConfig& rollout_config) {
+  // Same validation contract as random-dice entry point.
   validate_selection(player1_selection);
   validate_selection(player2_selection);
   validate_n_games(n_games);
@@ -393,6 +397,7 @@ MatchupSimulationResult simulate_matchup_with_rolls(
   result.games.reserve(n_games);
 
   for (int game_id = 1; game_id <= n_games; ++game_id) {
+    // Each replay uses identical scripted roll prefix but independent board state.
     result.games.push_back(simulate_one_game_with_rolls(
         initial_board,
         rolls,
@@ -409,6 +414,7 @@ MatchupSimulationResult simulate_matchup_with_rolls(
 
 // Convert internal result object to R list object used by R wrappers.
 Rcpp::List matchup_simulation_result_to_list(const MatchupSimulationResult& result) {
+  // Keep both granular (games) and aggregate (summary/settings) views.
   return Rcpp::List::create(
       Rcpp::_["initial_board"] = board_to_list(result.initial_board),
       Rcpp::_["games"] = games_to_data_frame(result),
@@ -435,6 +441,7 @@ Rcpp::List bg_cpp_simulate_matchup_random(
     const std::string& player2_selection,
     const int seed,
     const bool use_seed) {
+  // Parse board and initialize RNG once for the full simulation batch.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   std::mt19937 rng = init_rng(seed, use_seed);
 
@@ -460,6 +467,7 @@ Rcpp::List bg_cpp_simulate_matchup_scripted(
     const std::string& player2_selection,
     const int seed,
     const bool use_seed) {
+  // Parse board + scripted rolls up front.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::DiceRoll> parsed_rolls = parse_roll_vector(rolls);
 
@@ -495,6 +503,7 @@ Rcpp::List bg_cpp_simulate_matchup_random_rollout(
     const int max_rollout_turns,
     const int seed,
     const bool use_seed) {
+  // Random-dice rollout matchup wrapper (rollout policies enabled).
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   std::mt19937 rng = init_rng(seed, use_seed);
   // Rollout-specific config used when players are rollout family selectors.
@@ -524,6 +533,7 @@ Rcpp::List bg_cpp_simulate_matchup_scripted_rollout(
     const int max_rollout_turns,
     const int seed,
     const bool use_seed) {
+  // Scripted-dice rollout matchup wrapper (rollout policies enabled).
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::DiceRoll> parsed_rolls = parse_roll_vector(rolls);
   std::mt19937 rng = init_rng(seed, use_seed);
