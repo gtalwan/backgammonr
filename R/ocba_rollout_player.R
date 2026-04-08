@@ -1,3 +1,4 @@
+# Legacy OCBA rollout wrappers retained for compatibility with older APIs.
 #' Evaluate legal moves with OCBA rollout allocation
 #'
 #' Compatibility wrapper around [evaluate_actions_ocba()]. The rollout budget

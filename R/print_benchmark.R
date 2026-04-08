@@ -1,3 +1,4 @@
+# Print helpers for legacy benchmark, tradeoff, and variance-control objects.
 #' Print a matchup benchmark
 #'
 #' @param x A `bg_matchup_benchmark` object.

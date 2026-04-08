@@ -1,3 +1,4 @@
+# Legacy Thompson-rollout wrappers retained for compatibility.
 #' Evaluate legal moves with Thompson-sampling rollout
 #'
 #' Compatibility wrapper around [evaluate_actions_thompson()]. The rollout

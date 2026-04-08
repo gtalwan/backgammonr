@@ -1,3 +1,4 @@
+# Runtime profiling helpers for rollout-heavy engine components.
 #' Profile rollout runtime components
 #'
 #' Profiles key runtime components for random-policy simulation workloads:

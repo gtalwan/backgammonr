@@ -1,3 +1,4 @@
+# Random-player wrappers used by game simulation and compatibility APIs.
 #' Choose a legal move uniformly at random
 #'
 #' Selects one move sequence uniformly at random from a supplied legal-move set.

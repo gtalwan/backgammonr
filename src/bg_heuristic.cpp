@@ -10,6 +10,8 @@
 
 namespace {
 
+// Heuristic kernels use explicit player validation because many helper
+// functions are also called from exported entry points.
 void validate_player(const int player) {
   if (player != 1 && player != -1) {
     throw std::range_error("`player` must be either 1L or -1L.");
@@ -17,12 +19,15 @@ void validate_player(const int player) {
 }
 
 void validate_heuristic_selection(const std::string& selection) {
+  // The heuristic layer intentionally exposes only two hand-crafted scoring
+  // systems so the game engine can treat them as named strategies.
   if (selection != "aggressive" && selection != "defensive") {
     throw std::range_error("`selection` must be either \"aggressive\" or \"defensive\".");
   }
 }
 
 int pip_distance_to_off(const int player, const int point) {
+  // Convert a board coordinate into remaining pip distance for one player.
   validate_player(player);
 
   if (point < 1 || point > backgammonr::kNumPoints) {
@@ -37,6 +42,8 @@ int pip_distance_to_off(const int player, const int point) {
 }
 
 bool point_has_player_contact(const backgammonr::BoardState& board, const int player, const int point) {
+  // Contact means an opposing checker still lies ahead in the race, so the
+  // checker can still be hit or can hit later.
   validate_player(player);
 
   if (player == 1) {
@@ -62,6 +69,8 @@ bool blot_is_directly_hittable_by_die(
     const int attacker,
     const int target_point,
     const int die) {
+  // Check direct one-die hits only; the heuristic summaries intentionally keep
+  // this measure lightweight.
   validate_player(attacker);
 
   const int defender = -attacker;
@@ -82,6 +91,7 @@ bool blot_is_directly_hittable_by_die(
 }
 
 int count_direct_shot_dice_against_blots(const backgammonr::BoardState& board, const int attacker) {
+  // Count how many distinct die faces immediately hit an opposing blot.
   validate_player(attacker);
 
   int count = 0;
@@ -105,6 +115,8 @@ int count_direct_shot_dice_against_blots(const backgammonr::BoardState& board, c
 backgammonr::BoardState apply_sequence_without_full_validation(
     const backgammonr::BoardState& board,
     const backgammonr::MoveSequence& sequence) {
+  // The heuristic scorer evaluates legal candidates only, so it can skip the
+  // slower legality checks when constructing successor states.
   backgammonr::BoardState out = board;
   for (const backgammonr::MoveStep& step : sequence.steps) {
     backgammonr::apply_move_step_unchecked_inplace(out, sequence.player, step);
@@ -118,6 +130,8 @@ backgammonr::BoardState apply_sequence_without_full_validation(
 namespace backgammonr {
 
 BoardFeatures extract_board_features(const BoardState& board, const int player) {
+  // Compute one compact feature bundle reused by both heuristic scorers and
+  // by the R-facing board-feature API.
   validate_player(player);
 
   BoardFeatures features;
@@ -162,6 +176,8 @@ BoardFeatures extract_board_features(const BoardState& board, const int player) 
 }
 
 double aggressive_board_score(const BoardState& board, const int player) {
+  // Aggressive scoring values contact, hitting opportunities, and opponent bar
+  // pressure more heavily than pure racing progress.
   const BoardFeatures f = extract_board_features(board, player);
 
   return
@@ -178,6 +194,8 @@ double aggressive_board_score(const BoardState& board, const int player) {
 }
 
 double defensive_board_score(const BoardState& board, const int player) {
+  // Defensive scoring prioritizes making points, reducing blots, and limiting
+  // immediate shot risk.
   const BoardFeatures f = extract_board_features(board, player);
 
   return
@@ -193,6 +211,7 @@ double defensive_board_score(const BoardState& board, const int player) {
 }
 
 double heuristic_board_score(const BoardState& board, const int player, const std::string& selection) {
+  // Dispatch named heuristic families through one entry point.
   validate_heuristic_selection(selection);
 
   if (selection == "aggressive") {
@@ -206,6 +225,7 @@ MoveSequence choose_best_heuristic_move_sequence(
     const BoardState& board,
     const std::vector<MoveSequence>& legal_moves,
     const std::string& selection) {
+  // Score each legal successor board and return the highest-scoring move.
   validate_heuristic_selection(selection);
 
   if (legal_moves.empty()) {
@@ -230,6 +250,7 @@ MoveSequence choose_best_heuristic_move_sequence(
 }
 
 Rcpp::List board_features_to_list(const BoardFeatures& features) {
+  // Convert the compact feature struct into a named list for R.
   return Rcpp::List::create(
     Rcpp::_["own_bar"] = Rcpp::IntegerVector::create(features.own_bar),
     Rcpp::_["opponent_bar"] = Rcpp::IntegerVector::create(features.opponent_bar),
@@ -253,6 +274,7 @@ double bg_cpp_heuristic_board_score(
     const Rcpp::List& board,
     const int player,
     const std::string& selection) {
+  // Exported scalar score for one board/player pair.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   return backgammonr::heuristic_board_score(parsed_board, player, selection);
 }

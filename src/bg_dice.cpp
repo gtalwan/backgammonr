@@ -7,14 +7,18 @@
 
 namespace {
 
+// Roll objects are simple named lists, so validation begins with explicit
+// field-presence checks.
 bool has_named_element(const Rcpp::List& x, const char* name) {
   return x.containsElementNamed(name);
 }
 
+// Dice are always carried as integer vectors in the public R representation.
 bool is_integer_vector_sexp(const SEXP x) {
   return TYPEOF(x) == INTSXP;
 }
 
+// Collapse multi-issue validation into one readable R error message.
 std::string collapse_messages(const std::vector<std::string>& messages) {
   std::ostringstream oss;
 
@@ -31,6 +35,8 @@ std::string collapse_messages(const std::vector<std::string>& messages) {
 Rcpp::IntegerVector get_dice_checked(
     const Rcpp::List& roll,
     std::vector<std::string>& messages) {
+  // Parse the two dice without throwing so validate_roll_list() can keep one
+  // consistent validation pathway.
   if (!has_named_element(roll, "dice")) {
     messages.push_back("Missing required field `dice`.");
     return Rcpp::IntegerVector();
@@ -65,6 +71,7 @@ Rcpp::IntegerVector get_dice_checked(
 namespace backgammonr {
 
 DiceRoll make_roll(const int die1, const int die2) {
+  // Canonical roll constructor with strict 1..6 bounds.
   if (die1 < kMinDieValue || die1 > kMaxDieValue) {
     throw std::range_error("`die1` must be between 1 and 6.");
   }
@@ -80,11 +87,14 @@ DiceRoll make_roll(const int die1, const int die2) {
 }
 
 DiceRoll roll_dice(std::mt19937& rng) {
+  // IID dice generator used by the game and rollout engines.
   std::uniform_int_distribution<int> dist(kMinDieValue, kMaxDieValue);
   return make_roll(dist(rng), dist(rng));
 }
 
 Rcpp::IntegerVector expanded_roll(const DiceRoll& roll) {
+  // Doubles expand to four pips because one physical roll yields four legal
+  // move steps in backgammon.
   const int expanded_size = roll.is_double() ? kDoubleExpandedDice : kNumDice;
   Rcpp::IntegerVector expanded(expanded_size);
 
@@ -101,6 +111,7 @@ Rcpp::IntegerVector expanded_roll(const DiceRoll& roll) {
 }
 
 Rcpp::List roll_to_list(const DiceRoll& roll) {
+  // Normalize to the public list shape with both compact and expanded forms.
   Rcpp::IntegerVector dice(kNumDice);
   dice[0] = roll.dice[0];
   dice[1] = roll.dice[1];
@@ -116,6 +127,8 @@ Rcpp::List roll_to_list(const DiceRoll& roll) {
 }
 
 std::vector<std::string> validate_roll_list(const Rcpp::List& roll) {
+  // Roll validation is intentionally strict because downstream move generation
+  // assumes a complete and legal dice pair.
   std::vector<std::string> messages;
   const Rcpp::IntegerVector dice = get_dice_checked(roll, messages);
 
@@ -137,6 +150,7 @@ std::vector<std::string> validate_roll_list(const Rcpp::List& roll) {
 }
 
 DiceRoll parse_roll_list(const Rcpp::List& roll) {
+  // Convert the validated roll list into the fixed DiceRoll struct.
   const std::vector<std::string> messages = validate_roll_list(roll);
   if (!messages.empty()) {
     throw std::range_error(collapse_messages(messages));
@@ -150,11 +164,13 @@ DiceRoll parse_roll_list(const Rcpp::List& roll) {
 
 // [[Rcpp::export]]
 Rcpp::List bg_cpp_roll_create(const int die1, const int die2) {
+  // Exported constructor for one explicit roll.
   return backgammonr::roll_to_list(backgammonr::make_roll(die1, die2));
 }
 
 // [[Rcpp::export]]
 Rcpp::List bg_cpp_roll_dice(const int n, const int seed, const bool use_seed) {
+  // Exported random roll generator used by the R helper layer and tests.
   if (n < 1) {
     throw std::range_error("`n` must be at least 1.");
   }

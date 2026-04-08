@@ -7,6 +7,8 @@
 
 namespace {
 
+// These fast validators sit in the anonymous namespace so the public wrappers
+// can stay strict while internal hot paths reuse the unchecked variants.
 void validate_player(const int player) {
   if (player != 1 && player != -1) {
     throw std::range_error("`player` must be either 1L or -1L.");
@@ -14,12 +16,14 @@ void validate_player(const int player) {
 }
 
 void validate_point(const int point) {
+  // Engine coordinates are 1-based point indices plus separate bar/off codes.
   if (point < 1 || point > backgammonr::kNumPoints) {
     throw std::range_error("`point` must be between 1 and 24.");
   }
 }
 
 inline int player_index_fast(const int player) {
+  // Map signed player ids to compact 0/1 array indices.
   return player == 1 ? 0 : 1;
 }
 
@@ -31,6 +35,8 @@ inline int player_checker_count_on_point_fast(
     const backgammonr::BoardState& board,
     const int player,
     const int point) {
+  // Points store signed occupancy, so extracting one player's checkers is just
+  // a sign-aware projection.
   const int raw = board.points[point - 1];
   if (player == 1) {
     return raw > 0 ? raw : 0;
@@ -53,6 +59,7 @@ inline bool point_is_open_to_player_fast(
     const backgammonr::BoardState& board,
     const int player,
     const int point) {
+  // A point is open when the opponent has fewer than two checkers there.
   return opponent_checker_count_on_point_fast(board, player, point) < 2;
 }
 
@@ -77,6 +84,8 @@ inline bool is_home_point_fast(const int player, const int point) {
 }
 
 bool all_checkers_in_home_fast(const backgammonr::BoardState& board, const int player) {
+  // Bearing off is only legal when all of the acting player's checkers are in
+  // their home board and none remain on the bar.
   if (player_has_bar_checkers_fast(board, player)) {
     return false;
   }
@@ -99,6 +108,7 @@ bool all_checkers_in_home_fast(const backgammonr::BoardState& board, const int p
 }
 
 inline int bar_entry_point_fast(const int player, const int die) {
+  // Convert a die into the entry point reached from the bar.
   if (player == 1) {
     return backgammonr::kNumPoints + 1 - die;
   }
@@ -109,6 +119,8 @@ bool has_checkers_farther_from_off_in_home_fast(
     const backgammonr::BoardState& board,
     const int player,
     const int point) {
+  // Oversize bear-offs are legal only if no checker lies farther from the off
+  // position inside the home board.
   if (!is_home_point_fast(player, point)) {
     return false;
   }
@@ -135,6 +147,8 @@ std::optional<backgammonr::MoveStep> legal_step_from_source_fast(
     const int player,
     const int from,
     const int die) {
+  // Generate one legal step from one source point and one die, including bar
+  // entries and legal bear-offs.
   if (die < backgammonr::kMinDieValue || die > backgammonr::kMaxDieValue) {
     return std::nullopt;
   }
@@ -225,11 +239,13 @@ std::optional<backgammonr::MoveStep> legal_step_from_source_fast(
 namespace backgammonr {
 
 int player_index(const int player) {
+  // Public checked wrapper around the fast player-index projection.
   validate_player(player);
   return player_index_fast(player);
 }
 
 int opponent_index(const int player) {
+  // Public checked wrapper returning the opposing player's compact index.
   validate_player(player);
   return opponent_index_fast(player);
 }
@@ -259,6 +275,7 @@ bool point_has_opponent_blot(const BoardState& board, const int player, const in
 }
 
 bool player_has_bar_checkers(const BoardState& board, const int player) {
+  // Convenience wrapper used heavily by move generation and state summaries.
   validate_player(player);
   return player_has_bar_checkers_fast(board, player);
 }
@@ -270,6 +287,7 @@ bool is_home_point(const int player, const int point) {
 }
 
 bool all_checkers_in_home(const BoardState& board, const int player) {
+  // Public checked wrapper for bear-off eligibility.
   validate_player(player);
   return all_checkers_in_home_fast(board, player);
 }
@@ -298,6 +316,7 @@ std::optional<MoveStep> legal_step_from_source(
     const int player,
     const int from,
     const int die) {
+  // Checked legal-step constructor used by higher-level validation code.
   validate_player(player);
   return legal_step_from_source_fast(board, player, from, die);
 }
@@ -307,6 +326,7 @@ void legal_steps_for_die_into(
     const int player,
     const int die,
     std::vector<MoveStep>& steps) {
+  // Fill a dynamic vector from the stack-based hot-path helper.
   std::array<MoveStep, kNumPoints> stack_steps{};
   const int n_steps = legal_steps_for_die_into_array(board, player, die, stack_steps);
   steps.clear();
@@ -321,6 +341,8 @@ int legal_steps_for_die_into_array(
     const int player,
     const int die,
     std::array<MoveStep, kNumPoints>& steps) {
+  // Enumerate all legal one-step moves for one die. This is a hot path for the
+  // full move generator, so it writes into a caller-provided stack buffer.
   validate_player(player);
   int n_steps = 0;
 
@@ -368,6 +390,8 @@ void apply_move_step_unchecked_inplace(
     BoardState& board,
     const int player,
     const MoveStep& step) {
+  // Mutate the packed board state directly after legality has already been
+  // established by the move generator.
   const int current_player_index = player_index_fast(player);
   const int other_player_index = opponent_index_fast(player);
 
@@ -395,6 +419,7 @@ void apply_move_step_inplace(
     BoardState& board,
     const int player,
     const MoveStep& step) {
+  // Checked move-step application used by exported APIs and validators.
   validate_player(player);
 
   const std::optional<MoveStep> legal_step =

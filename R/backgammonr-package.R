@@ -1,3 +1,4 @@
+# Package-level documentation and namespace setup for backgammonr.
 #' backgammonr: Thompson sampling for finite-budget backgammon decisions
 #'
 #' `backgammonr` is a Thompson-sampling research toolkit for fixed-budget

@@ -1,9 +1,11 @@
 # Legacy output-table formatters and report-facing table builders.
 bg_has_non_missing <- function(x) {
+  # Convenience predicate for dropping entirely empty summary columns.
   any(!is.na(x))
 }
 
 bg_truncate_rows <- function(df, n, arg_name = "n") {
+  # Optionally keep only the leading rows of a pre-sorted summary table.
   if (is.null(n)) {
     return(df)
   }
@@ -17,6 +19,7 @@ bg_truncate_rows <- function(df, n, arg_name = "n") {
 }
 
 bg_first_present_column <- function(df, candidates) {
+  # Pick the first available column from a preferred-name list.
   hit <- candidates[candidates %in% names(df)]
   if (length(hit) == 0L) {
     return(NULL)
@@ -25,6 +28,8 @@ bg_first_present_column <- function(df, candidates) {
 }
 
 bg_compact_action_table <- function(results, n = NULL, include_interval = TRUE) {
+  # Reformat action-level truth/posterior tables into a compact report-ready
+  # layout with stable column names.
   results <- as.data.frame(results, stringsAsFactors = FALSE)
   if (nrow(results) == 0L) {
     return(results)
@@ -119,6 +124,7 @@ bg_compact_action_table <- function(results, n = NULL, include_interval = TRUE) 
 }
 
 bg_compact_benchmark_summary <- function(summary_df, n = NULL) {
+  # Compact one benchmark-study summary to the key cross-method columns.
   summary_df <- as.data.frame(summary_df, stringsAsFactors = FALSE)
   if (nrow(summary_df) == 0L) {
     return(summary_df)
@@ -175,6 +181,8 @@ bg_compact_benchmark_summary <- function(summary_df, n = NULL) {
 }
 
 bg_compact_budget_tradeoff_table <- function(results, n = NULL) {
+  # Present one recommendation-vs-budget table with consistent naming across
+  # methods and studies.
   results <- as.data.frame(results, stringsAsFactors = FALSE)
   if (nrow(results) == 0L) {
     return(results)

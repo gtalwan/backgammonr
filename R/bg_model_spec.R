@@ -1,6 +1,8 @@
 # Reward-model and posterior-model validation, defaults, and compatibility rules.
 # Public reward-model choices are intentionally small and explicit.
 bg_match_reward_model_public <- function(reward_model) {
+  # Canonicalize the user-facing reward-model label and reject the removed
+  # legacy alias before it leaks into the rest of the package.
   if (length(reward_model) > 1L) {
     reward_model <- reward_model[[1L]]
   }
@@ -24,6 +26,8 @@ bg_match_reward_model_public <- function(reward_model) {
 # Keep the full supported posterior family list centralized even though only a
 # smaller subset is presentation-central.
 bg_match_posterior_model_public <- function(posterior_model) {
+  # Canonicalize the posterior-family label once so downstream workflows do not
+  # repeat match.arg() logic.
   if (length(posterior_model) > 1L) {
     posterior_model <- posterior_model[[1L]]
   }
@@ -44,6 +48,7 @@ bg_match_posterior_model_public <- function(posterior_model) {
 # Supported models are all valid combinations; recommended models are the ones
 # the package is willing to foreground in docs and examples.
 bg_supported_posterior_models <- function(reward_model) {
+  # Return every posterior family allowed for the chosen reward type.
   reward_model <- bg_match_reward_model_public(reward_model)
   switch(
     reward_model,
@@ -54,6 +59,7 @@ bg_supported_posterior_models <- function(reward_model) {
 }
 
 bg_recommended_posterior_models <- function(reward_model) {
+  # Return the smaller set of model families the package treats as central.
   reward_model <- bg_match_reward_model_public(reward_model)
   switch(
     reward_model,
@@ -64,6 +70,7 @@ bg_recommended_posterior_models <- function(reward_model) {
 }
 
 bg_validate_named_numeric_scalar <- function(x, name, lower = -Inf, open_lower = FALSE) {
+  # Shared scalar validator for prior hyperparameters.
   if (!is.numeric(x) || length(x) != 1L || is.na(x) || !is.finite(x)) {
     stop(sprintf("`%s` must be a finite numeric scalar.", name), call. = FALSE)
   }
@@ -78,6 +85,8 @@ bg_validate_named_numeric_scalar <- function(x, name, lower = -Inf, open_lower =
 }
 
 bg_validate_probability_triplet <- function(x, name) {
+  # Validate three-category probability vectors used by collapsed categorical
+  # outcome models.
   if (!is.numeric(x) || length(x) != 3L || anyNA(x) || any(!is.finite(x)) || any(x <= 0)) {
     stop(sprintf("`%s` must be a positive numeric vector of length 3.", name), call. = FALSE)
   }
@@ -85,6 +94,7 @@ bg_validate_probability_triplet <- function(x, name) {
 }
 
 bg_validate_positive_numeric_vector <- function(x, name, expected_lengths = NULL) {
+  # Validate positive alpha/payoff vectors with optional length constraints.
   if (!is.numeric(x) || anyNA(x) || any(!is.finite(x)) || any(x <= 0)) {
     stop(sprintf("`%s` must be a positive numeric vector.", name), call. = FALSE)
   }
@@ -102,6 +112,7 @@ bg_validate_positive_numeric_vector <- function(x, name, expected_lengths = NULL
 }
 
 bg_scored_outcome_names <- function() {
+  # Canonical seven-category scored-outcome labels used by the Dirichlet path.
   c(
     "single_loss",
     "gammon_loss",
@@ -114,6 +125,8 @@ bg_scored_outcome_names <- function() {
 }
 
 bg_default_scored_payoff_map <- function(unresolved_value) {
+  # Default mapping from scored categorical outcomes onto the package's bounded
+  # scalar reward scale.
   stats::setNames(
     c(1 / 3, 1 / 6, 0, unresolved_value, 2 / 3, 5 / 6, 1),
     bg_scored_outcome_names()
@@ -129,6 +142,8 @@ bg_resolve_posterior_prior <- function(
     prior_alpha = 1,
     prior_beta = 1,
     posterior_prior = NULL) {
+  # Build one validated, stack-specific prior object for downstream Thompson
+  # and posterior-summary code.
   prior_alpha <- bg_validate_named_numeric_scalar(prior_alpha, "prior_alpha", lower = 0, open_lower = TRUE)
   prior_beta <- bg_validate_named_numeric_scalar(prior_beta, "prior_beta", lower = 0, open_lower = TRUE)
 
@@ -215,6 +230,8 @@ bg_resolve_posterior_prior <- function(
 }
 
 bg_model_spec_signature <- function(prior) {
+  # Serialize the resolved prior into a stable signature string for caching and
+  # reproducibility metadata.
   pieces <- unlist(
     lapply(
       sort(names(prior)),

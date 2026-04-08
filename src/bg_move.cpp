@@ -7,14 +7,18 @@
 
 namespace {
 
+// Move parsing mirrors the public R list contract exactly, so the C++ kernels
+// can reject malformed steps and sequences before simulation starts.
 bool is_integer_vector_sexp(const SEXP x) {
   return TYPEOF(x) == INTSXP;
 }
 
 bool is_logical_vector_sexp(const SEXP x) {
+  // `hit` is stored as an explicit logical scalar in the R representation.
   return TYPEOF(x) == LGLSXP;
 }
 
+// Collect parser diagnostics across nested step/sequence structures.
 std::string collapse_messages(const std::vector<std::string>& messages) {
   std::ostringstream oss;
 
@@ -29,6 +33,7 @@ std::string collapse_messages(const std::vector<std::string>& messages) {
 }
 
 bool has_named_element(const Rcpp::List& x, const char* name) {
+  // Named-field checks keep error messages specific to the offending field.
   return x.containsElementNamed(name);
 }
 
@@ -36,6 +41,8 @@ int get_scalar_int_checked(
     const Rcpp::List& x,
     const char* name,
     std::vector<std::string>& messages) {
+  // Extract a required integer scalar while appending parse diagnostics to the
+  // shared message vector.
   if (!has_named_element(x, name)) {
     messages.push_back(std::string("Missing required field `") + name + "`.");
     return 0;
@@ -65,6 +72,8 @@ bool get_scalar_bool_checked(
     const Rcpp::List& x,
     const char* name,
     std::vector<std::string>& messages) {
+  // Extract the logical `hit` flag with the same non-throwing validation style
+  // used by the integer fields.
   if (!has_named_element(x, name)) {
     messages.push_back(std::string("Missing required field `") + name + "`.");
     return false;
@@ -91,6 +100,8 @@ bool get_scalar_bool_checked(
 }
 
 std::array<int, backgammonr::kMaxDieValue + 1> count_dice(const std::vector<int>& dice) {
+  // Count repeated die values so move-sequence construction can verify that a
+  // roll supplies enough copies of each die.
   std::array<int, backgammonr::kMaxDieValue + 1> counts{};
 
   for (const int die : dice) {
@@ -107,6 +118,7 @@ std::array<int, backgammonr::kMaxDieValue + 1> count_dice(const std::vector<int>
 namespace backgammonr {
 
 MoveStep make_move_step(const int from, const int to, const int die, const bool hit) {
+  // Canonical checked constructor for one atomic move step.
   std::vector<std::string> messages;
 
   if (from < kBarPosition || from > kNumPoints) {
@@ -144,6 +156,7 @@ MoveStep make_move_step(const int from, const int to, const int die, const bool 
 }
 
 Rcpp::List move_step_to_list(const MoveStep& step) {
+  // Convert the compact MoveStep struct into the public R list shape.
   return Rcpp::List::create(
     Rcpp::_["from"] = Rcpp::IntegerVector::create(step.from),
     Rcpp::_["to"] = Rcpp::IntegerVector::create(step.to),
@@ -153,6 +166,8 @@ Rcpp::List move_step_to_list(const MoveStep& step) {
 }
 
 std::vector<std::string> validate_move_step_list(const Rcpp::List& step) {
+  // Validate a step object without throwing so callers can accumulate nested
+  // diagnostics for complete move-sequence objects.
   std::vector<std::string> messages;
   const int from = get_scalar_int_checked(step, "from", messages);
   const int to = get_scalar_int_checked(step, "to", messages);
@@ -180,6 +195,7 @@ std::vector<std::string> validate_move_step_list(const Rcpp::List& step) {
 }
 
 MoveStep parse_move_step_list(const Rcpp::List& step) {
+  // Parse one validated move-step list into the engine struct.
   const std::vector<std::string> messages = validate_move_step_list(step);
   if (!messages.empty()) {
     throw std::range_error(collapse_messages(messages));
@@ -194,6 +210,7 @@ MoveStep parse_move_step_list(const Rcpp::List& step) {
 }
 
 std::vector<MoveStep> parse_move_step_vector(const Rcpp::List& steps) {
+  // Parse a list of move-step objects, preserving index-specific error labels.
   std::vector<std::string> messages;
   std::vector<MoveStep> out;
   out.reserve(steps.size());
@@ -233,6 +250,7 @@ MoveSequence make_move_sequence(
     const int player,
     const std::vector<MoveStep>& steps,
     const std::optional<DiceRoll>& roll) {
+  // Canonical checked constructor for one full-turn move sequence.
   std::vector<std::string> messages;
 
   if (player != 1 && player != -1) {
@@ -294,6 +312,8 @@ MoveSequence make_move_sequence(
 }
 
 std::vector<std::string> validate_move_sequence_list(const Rcpp::List& sequence) {
+  // Validate the outer sequence object and then delegate step/roll validation
+  // to the lower-level parsers above.
   std::vector<std::string> messages;
 
   const int player = get_scalar_int_checked(sequence, "player", messages);
@@ -352,6 +372,7 @@ std::vector<std::string> validate_move_sequence_list(const Rcpp::List& sequence)
 }
 
 MoveSequence parse_move_sequence_list(const Rcpp::List& sequence) {
+  // Parse one validated move-sequence list into the engine struct.
   const std::vector<std::string> messages = validate_move_sequence_list(sequence);
   if (!messages.empty()) {
     throw std::range_error(collapse_messages(messages));
@@ -372,6 +393,7 @@ MoveSequence parse_move_sequence_list(const Rcpp::List& sequence) {
 }
 
 std::vector<MoveSequence> parse_move_sequence_vector(const Rcpp::List& sequences) {
+  // Parse a whole legal-move list while preserving per-element diagnostics.
   std::vector<std::string> messages;
   std::vector<MoveSequence> out;
   out.reserve(sequences.size());
@@ -408,6 +430,7 @@ std::vector<MoveSequence> parse_move_sequence_vector(const Rcpp::List& sequences
 }
 
 bool move_sequences_equal(const MoveSequence& lhs, const MoveSequence& rhs) {
+  // Equality is structural: player, optional roll, and each step must match.
   if (lhs.player != rhs.player) {
     return false;
   }
@@ -440,6 +463,8 @@ bool move_sequences_equal(const MoveSequence& lhs, const MoveSequence& rhs) {
 }
 
 Rcpp::List move_sequence_to_list(const MoveSequence& sequence) {
+  // Convert a full move sequence into the normalized R representation used
+  // throughout the package.
   Rcpp::List step_list(sequence.steps.size());
   Rcpp::IntegerVector dice_used(sequence.steps.size());
 
@@ -466,11 +491,13 @@ Rcpp::List move_sequence_to_list(const MoveSequence& sequence) {
 
 // [[Rcpp::export]]
 Rcpp::List bg_cpp_move_step_create(const int from, const int to, const int die, const bool hit = false) {
+  // Exported checked constructor for one move step.
   return backgammonr::move_step_to_list(backgammonr::make_move_step(from, to, die, hit));
 }
 
 // [[Rcpp::export]]
 Rcpp::List bg_cpp_move_sequence_create(const int player, const Rcpp::List& steps) {
+  // Exported constructor for a move sequence without an attached roll.
   const std::vector<backgammonr::MoveStep> parsed_steps = backgammonr::parse_move_step_vector(steps);
   const backgammonr::MoveSequence sequence = backgammonr::make_move_sequence(player, parsed_steps, std::nullopt);
   return backgammonr::move_sequence_to_list(sequence);
@@ -481,6 +508,7 @@ Rcpp::List bg_cpp_move_sequence_create_with_roll(
     const int player,
     const Rcpp::List& steps,
     const Rcpp::List& roll) {
+  // Exported constructor that binds a full-turn roll to the move sequence.
   const std::vector<backgammonr::MoveStep> parsed_steps = backgammonr::parse_move_step_vector(steps);
   const backgammonr::DiceRoll parsed_roll = backgammonr::parse_roll_list(roll);
   const backgammonr::MoveSequence sequence = backgammonr::make_move_sequence(player, parsed_steps, parsed_roll);

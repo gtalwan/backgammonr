@@ -7,14 +7,20 @@
 
 namespace {
 
+// Named-field checks let the parser report all missing board components in one
+// pass rather than failing on the first lookup.
 bool has_named_element(const Rcpp::List& board, const char* name) {
   return board.containsElementNamed(name);
 }
 
+// The board ABI expects integer storage so points/bar/off can round-trip
+// cleanly between R lists and the C++ BoardState struct.
 bool is_integer_vector_sexp(const SEXP x) {
   return TYPEOF(x) == INTSXP;
 }
 
+// Validation helpers collect multiple issues before throwing. Collapse them
+// into one newline-delimited message for the R front end.
 std::string collapse_messages(const std::vector<std::string>& messages) {
   std::ostringstream oss;
 
@@ -33,6 +39,8 @@ Rcpp::IntegerVector get_integer_vector_checked(
     const char* name,
     const int expected_length,
     std::vector<std::string>& messages) {
+  // Parse one named integer field and attach shape/NA diagnostics to the
+  // shared message buffer instead of throwing immediately.
   if (!has_named_element(board, name)) {
     messages.push_back(std::string("Missing required field `") + name + "`.");
     return Rcpp::IntegerVector();
@@ -64,6 +72,8 @@ Rcpp::IntegerVector get_integer_vector_checked(
 }
 
 int get_turn_checked(const Rcpp::List& board, std::vector<std::string>& messages) {
+  // Turns are always stored as signed player ids: +1 for player 1, -1 for
+  // player 2. Keep the parser strict so the rest of the engine can assume that.
   if (!has_named_element(board, "turn")) {
     messages.push_back("Missing required field `turn`.");
     return 0;
@@ -93,6 +103,8 @@ void check_nonnegative(
     const Rcpp::IntegerVector& values,
     const char* name,
     std::vector<std::string>& messages) {
+  // Bar/off counts are ownership-specific vectors and therefore cannot be
+  // represented with signed occupancy like point counts can.
   for (int i = 0; i < values.size(); ++i) {
     if (values[i] < 0) {
       messages.push_back(std::string("`") + name + "` must be nonnegative.");
@@ -104,6 +116,7 @@ void check_nonnegative(
 void check_point_bounds(
     const Rcpp::IntegerVector& points,
     std::vector<std::string>& messages) {
+  // No point can contain more than all 15 checkers for one side.
   for (int i = 0; i < points.size(); ++i) {
     if (std::abs(points[i]) > backgammonr::kCheckersPerPlayer) {
       std::ostringstream oss;
@@ -120,6 +133,8 @@ void check_total_checkers(
     const Rcpp::IntegerVector& bar,
     const Rcpp::IntegerVector& off,
     std::vector<std::string>& messages) {
+  // Total-material validation prevents subtle state corruption before the
+  // move generator or rollout code ever sees the board.
   int player1_total = bar[0] + off[0];
   int player2_total = bar[1] + off[1];
 
@@ -153,6 +168,7 @@ void check_total_checkers(
 namespace backgammonr {
 
 BoardState initial_board_state(const int turn) {
+  // Build the canonical starting position used by the opening-roll studies.
   BoardState board;
   board.turn = turn;
 
@@ -173,6 +189,8 @@ BoardState initial_board_state(const int turn) {
 }
 
 Rcpp::List board_to_list(const BoardState& board) {
+  // Convert the packed engine struct into the normalized list shape exposed to
+  // the R layer.
   Rcpp::IntegerVector points(kNumPoints);
   Rcpp::IntegerVector bar(kNumPlayers);
   Rcpp::IntegerVector off(kNumPlayers);
@@ -198,6 +216,8 @@ Rcpp::List board_to_list(const BoardState& board) {
 }
 
 std::vector<std::string> validate_board_list(const Rcpp::List& board) {
+  // Validate first, then let downstream parsers assume a complete and
+  // internally consistent board object.
   std::vector<std::string> messages;
 
   const Rcpp::IntegerVector points = get_integer_vector_checked(board, "points", kNumPoints, messages);
@@ -226,6 +246,7 @@ std::vector<std::string> validate_board_list(const Rcpp::List& board) {
 }
 
 BoardState parse_board_list(const Rcpp::List& board) {
+  // Materialize the validated R list into the fixed-width BoardState struct.
   const std::vector<std::string> messages = validate_board_list(board);
   if (!messages.empty()) {
     throw std::range_error(collapse_messages(messages));
@@ -251,6 +272,8 @@ BoardState parse_board_list(const Rcpp::List& board) {
 }
 
 Rcpp::List clone_board_list(const Rcpp::List& board) {
+  // Clone and normalize in one step so callers always get canonical integer
+  // storage and field ordering back.
   const BoardState parsed = parse_board_list(board);
   Rcpp::List out = Rcpp::clone(board);
   const Rcpp::List normalized = board_to_list(parsed);
@@ -267,6 +290,7 @@ Rcpp::List clone_board_list(const Rcpp::List& board) {
 
 // [[Rcpp::export]]
 Rcpp::List bg_cpp_board_initial(const int turn = 1) {
+  // Exported constructor for the opening board.
   if (turn != 1 && turn != -1) {
     throw std::range_error("`turn` must be either 1L or -1L.");
   }
@@ -276,11 +300,14 @@ Rcpp::List bg_cpp_board_initial(const int turn = 1) {
 
 // [[Rcpp::export]]
 Rcpp::List bg_cpp_board_clone(const Rcpp::List& board) {
+  // Exported normalization helper used by the R-facing board constructor.
   return backgammonr::clone_board_list(board);
 }
 
 // [[Rcpp::export]]
 Rcpp::List bg_cpp_board_validate(const Rcpp::List& board) {
+  // Return a validation report instead of throwing so R can surface multiple
+  // issues in one call.
   const std::vector<std::string> messages = backgammonr::validate_board_list(board);
 
   return Rcpp::List::create(

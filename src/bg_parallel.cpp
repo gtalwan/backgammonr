@@ -1,3 +1,4 @@
+// Parallel rollout-block kernels used by truth building and repeated TS studies.
 // [[Rcpp::depends(RcppParallel)]]
 #include <Rcpp.h>
 #include <RcppParallel.h>
@@ -24,6 +25,9 @@
 
 namespace {
 
+// Several raw legal-move sequences can collapse to the same successor board.
+// Keep one representative plus an equivalence count so rollout blocks can reuse
+// shared continuations without losing action-table bookkeeping.
 struct CollapsedCandidate {
   backgammonr::BoardState board_after{};
   int representative_index{0};
@@ -31,11 +35,16 @@ struct CollapsedCandidate {
   int n_equivalent{1};
 };
 
+// Optional forced-roll schedules support variance-reduced rollout blocks where
+// the first one or two future rolls are synchronized across actions.
 struct ForcedRollSchedule {
   std::array<backgammonr::DiceRoll, 2> rolls{};
   int n_rolls{0};
 };
 
+// Each task describes one candidate action and one rollout block for that
+// candidate. The worker layer consumes these tasks in parallel and returns
+// compact sufficient-stat updates.
 struct RolloutBlockTask {
   int candidate_position{0};
   int candidate_index{0};
@@ -45,6 +54,8 @@ struct RolloutBlockTask {
 };
 
 struct RolloutBlockResult {
+  // One worker task accumulates only sufficient statistics, keeping the
+  // cross-thread result object compact and cheap to merge.
   int candidate_index{0};
   int n_equivalent_sequences{1};
   int allocation_count{0};
@@ -64,6 +75,8 @@ struct RolloutBlockResult {
 backgammonr::BoardState apply_sequence_without_full_validation(
     const backgammonr::BoardState& board,
     const backgammonr::MoveSequence& sequence) {
+  // Collapse logic only touches legal root moves, so it can apply steps
+  // directly without paying the checked-mutation cost repeatedly.
   backgammonr::BoardState out = board;
 
   for (const backgammonr::MoveStep& step : sequence.steps) {
@@ -78,12 +91,15 @@ void play_random_turn_lightweight(
     backgammonr::BoardState& board,
     const backgammonr::DiceRoll& roll,
     std::mt19937& rng) {
+  // Fast path for random continuation play inside rollout blocks.
   (void) backgammonr::play_random_turn_rollout_fast(board, roll, rng);
 }
 
 double outcome_reward(
     const backgammonr::TerminalScoreClass outcome,
     const backgammonr::RolloutConfig& config) {
+  // Map multi-class rollout outcomes onto the bounded scalar reward scale used
+  // by the truth and Thompson study layers.
   if (outcome == backgammonr::TerminalScoreClass::kSingleWin ||
       outcome == backgammonr::TerminalScoreClass::kGammonWin ||
       outcome == backgammonr::TerminalScoreClass::kBackgammonWin) {
@@ -100,6 +116,7 @@ double outcome_reward(
 backgammonr::TerminalScoreClass outcome_from_turn_result(
     const backgammonr::TurnResult& turn_result,
     const int acting_player) {
+  // Translate a one-turn result back into the acting player's terminal class.
   if (!turn_result.game_over) {
     return backgammonr::TerminalScoreClass::kUnresolved;
   }
@@ -108,6 +125,8 @@ backgammonr::TerminalScoreClass outcome_from_turn_result(
 }
 
 const std::vector<backgammonr::DiceRoll>& unique_unordered_rolls() {
+  // Precompute the 21 unordered dice outcomes used by the stratified dice
+  // schedules.
   static const std::vector<backgammonr::DiceRoll> outcomes = []() {
     std::vector<backgammonr::DiceRoll> out;
     out.reserve(21);
@@ -125,6 +144,8 @@ std::uint32_t stable_rollout_seed(
     const std::uint32_t base_seed,
     const int sample_index,
     const int salt) {
+  // Hash one base seed with sample/task identifiers so each rollout gets a
+  // reproducible but decorrelated RNG stream.
   std::uint32_t x = base_seed ^ static_cast<std::uint32_t>(sample_index * 0x9e3779b9U);
   x ^= static_cast<std::uint32_t>(salt * 0x7f4a7c15U);
   x ^= x >> 16;
@@ -139,6 +160,8 @@ ForcedRollSchedule scheduled_forced_rolls(
     const std::string& dice_mode,
     const int sample_index,
     const int offset) {
+  // Build the optional synchronized roll prefix used by variance-reduction
+  // modes such as stratified first-roll and first-two-roll schedules.
   ForcedRollSchedule schedule;
 
   if (dice_mode == "iid") {
@@ -175,6 +198,8 @@ backgammonr::TerminalScoreClass single_rollout_outcome(
     const backgammonr::RolloutConfig& config,
     std::mt19937& rng,
     const ForcedRollSchedule& forced_rolls) {
+  // Run one continuation rollout from a fixed successor board and return the
+  // resulting terminal class or unresolved status.
   if (backgammonr::board_is_terminal(board_after)) {
     return backgammonr::terminal_score_class(board_after, acting_player);
   }
@@ -188,6 +213,7 @@ backgammonr::TerminalScoreClass single_rollout_outcome(
     int turns_remaining = config.max_turns;
 
     for (int forced_idx = 0; forced_idx < forced_rolls.n_rolls; ++forced_idx) {
+      // Stratified/CRN roll prefixes are consumed before the usual IID stream.
       if (turns_remaining <= 0) {
         return backgammonr::TerminalScoreClass::kUnresolved;
       }
@@ -200,6 +226,7 @@ backgammonr::TerminalScoreClass single_rollout_outcome(
     }
 
     for (int turn = 0; turn < turns_remaining; ++turn) {
+      // Remaining turns use fresh IID rolls from the worker-local RNG.
       play_random_turn_lightweight(current, backgammonr::roll_dice(rng), rng);
       if (backgammonr::board_is_terminal(current)) {
         return backgammonr::terminal_score_class(current, acting_player);
@@ -246,6 +273,8 @@ backgammonr::TerminalScoreClass single_rollout_outcome(
 }
 
 struct BoardStateKey {
+  // Hashable board snapshot used to collapse equivalent root moves before the
+  // parallel rollout stage.
   std::array<int, backgammonr::kNumPoints> points{};
   std::array<int, backgammonr::kNumPlayers> bar{};
   std::array<int, backgammonr::kNumPlayers> off{};
@@ -261,6 +290,7 @@ struct BoardStateKey {
 
 struct BoardStateKeyHash {
   std::size_t operator()(const BoardStateKey& key) const {
+    // Local rolling hash; good enough for temporary per-call deduplication.
     std::size_t h = static_cast<std::size_t>(key.turn * 1315423911U);
 
     for (const int value : key.points) {
@@ -278,6 +308,7 @@ struct BoardStateKeyHash {
 };
 
 BoardStateKey board_state_key(const backgammonr::BoardState& board) {
+  // Copy one packed board state into the hash-key wrapper.
   BoardStateKey key;
   key.points = board.points;
   key.bar = board.bar;
@@ -289,6 +320,8 @@ BoardStateKey board_state_key(const backgammonr::BoardState& board) {
 std::vector<CollapsedCandidate> collapse_equivalent_candidates(
     const backgammonr::BoardState& board,
     const std::vector<backgammonr::MoveSequence>& legal_moves) {
+  // Merge different legal sequences that lead to the same successor board so
+  // rollout work is shared while recommendation bookkeeping stays intact.
   std::vector<CollapsedCandidate> collapsed;
   collapsed.reserve(legal_moves.size());
   std::unordered_map<BoardStateKey, int, BoardStateKeyHash> key_to_collapsed_index;
@@ -331,6 +364,8 @@ class RolloutBlockWorker : public RcppParallel::Worker {
         results_(results) {}
 
   void operator()(std::size_t begin, std::size_t end) {
+    // Each task represents one candidate/block pair. The worker performs the
+    // requested number of rollouts and returns compact sufficient statistics.
     for (std::size_t task_index = begin; task_index < end; ++task_index) {
       const RolloutBlockTask& task = tasks_[task_index];
       const CollapsedCandidate& candidate = candidates_[task.candidate_position];
@@ -349,10 +384,13 @@ class RolloutBlockWorker : public RcppParallel::Worker {
           base_seed_,
           task.start_count + 1,
           task.candidate_index * 7919);
+      // Every task gets a stable but candidate-specific stream.
       std::mt19937 rng(task_seed);
       int stratification_offset = 0;
 
       if (config_.dice_mode != "iid" && !config_.crn) {
+        // Without CRN, candidates get independent random offsets into the
+        // stratified roll schedule.
         const int n_outcomes = config_.dice_mode == "stratified_first_two_rolls" ? 441 : 21;
         std::uniform_int_distribution<int> offset_dist(0, n_outcomes - 1);
         stratification_offset = offset_dist(rng);
@@ -367,6 +405,8 @@ class RolloutBlockWorker : public RcppParallel::Worker {
         std::mt19937* rollout_rng = &rng;
         std::mt19937 crn_rng;
         if (config_.crn) {
+          // Common-random-number mode synchronizes RNG streams by sample index
+          // rather than by candidate-specific task order.
           crn_rng.seed(stable_rollout_seed(base_seed_, sample_index, 0));
           rollout_rng = &crn_rng;
         }
@@ -379,6 +419,8 @@ class RolloutBlockWorker : public RcppParallel::Worker {
             forced_rolls);
 
         if (outcome == backgammonr::TerminalScoreClass::kSingleWin) {
+          // Keep both coarse win/loss counts and fine scored-outcome counts so
+          // the R layer can support several reward models from one result.
           out.single_win += 1;
           out.wins += 1;
         } else if (outcome == backgammonr::TerminalScoreClass::kGammonWin) {
@@ -434,6 +476,9 @@ Rcpp::List bg_cpp_rollout_blocks(
     const int task_block_size,
     const int seed,
     const bool use_seed) {
+  // Exported rollout-block engine used by truth construction and repeated
+  // Thompson studies. It parallelizes continuation play over collapsed root
+  // candidates and returns sufficient-stat increments only.
   if (task_block_size < 1) {
     throw std::range_error("`task_block_size` must be at least 1.");
   }
@@ -443,6 +488,7 @@ Rcpp::List bg_cpp_rollout_blocks(
       backgammonr::parse_move_sequence_vector(legal_moves);
   const std::vector<CollapsedCandidate> collapsed =
       collapse_equivalent_candidates(parsed_board, parsed_moves);
+  // Parallel rollout blocks run only over unique successor boards.
 
   backgammonr::RolloutConfig config;
   config.budget = 1;
@@ -456,6 +502,8 @@ Rcpp::List bg_cpp_rollout_blocks(
   Rcpp::IntegerVector collapsed_index(collapsed.size());
   Rcpp::IntegerVector n_equivalent_sequences(collapsed.size());
   for (int i = 0; i < static_cast<int>(collapsed.size()); ++i) {
+    // Expose the representative root index and multiplicity back to R so the
+    // caller can align collapsed results with the original candidate table.
     collapsed_index[i] = collapsed[i].representative_index + 1;
     n_equivalent_sequences[i] = collapsed[i].n_equivalent;
   }
@@ -504,6 +552,8 @@ Rcpp::List bg_cpp_rollout_blocks(
 
   std::vector<RolloutBlockTask> tasks;
   for (int i = 0; i < candidate_index.size(); ++i) {
+    // Split large requested rollout blocks into smaller worker tasks to keep
+    // task sizes bounded and the parallel work queue balanced.
     const int representative = candidate_index[i];
     const int n_rollouts = block_rollouts[i];
     const int start_count = normalized_start_counts[i];
@@ -538,6 +588,7 @@ Rcpp::List bg_cpp_rollout_blocks(
 
   std::mt19937 seed_rng = backgammonr::init_rng(seed, use_seed);
   const std::uint32_t base_seed = static_cast<std::uint32_t>(seed_rng());
+  // One base seed feeds all worker-local derived streams.
   std::vector<RolloutBlockResult> task_results(tasks.size());
 
   if (!tasks.empty()) {
@@ -552,6 +603,8 @@ Rcpp::List bg_cpp_rollout_blocks(
   std::unordered_map<int, RolloutBlockResult> aggregated;
   aggregated.reserve(candidate_index.size());
   for (int i = 0; i < candidate_index.size(); ++i) {
+    // Pre-seed aggregation rows so even zero-rollout requests produce a stable
+    // output row.
     RolloutBlockResult row;
     row.candidate_index = candidate_index[i];
     row.n_equivalent_sequences = collapsed[representative_to_position[candidate_index[i]]].n_equivalent;
@@ -559,6 +612,7 @@ Rcpp::List bg_cpp_rollout_blocks(
   }
 
   for (const RolloutBlockResult& task_row : task_results) {
+    // Merge worker-level chunks back to one row per representative candidate.
     RolloutBlockResult& agg = aggregated[task_row.candidate_index];
     agg.candidate_index = task_row.candidate_index;
     agg.n_equivalent_sequences = task_row.n_equivalent_sequences;
@@ -593,6 +647,7 @@ Rcpp::List bg_cpp_rollout_blocks(
 
   int row = 0;
   std::vector<int> ordered_candidates = Rcpp::as<std::vector<int>>(candidate_index);
+  // Return rows sorted by representative candidate id for deterministic output.
   std::sort(ordered_candidates.begin(), ordered_candidates.end());
   ordered_candidates.erase(std::unique(ordered_candidates.begin(), ordered_candidates.end()), ordered_candidates.end());
 
@@ -616,6 +671,9 @@ Rcpp::List bg_cpp_rollout_blocks(
   }
 
   return Rcpp::List::create(
+      // candidate_map describes the collapsed representative set;
+      // results contains the aggregated sufficient-stat increments requested by
+      // this call.
       Rcpp::_["candidate_map"] = Rcpp::DataFrame::create(
           Rcpp::_["candidate_index"] = collapsed_index,
           Rcpp::_["n_equivalent_sequences"] = n_equivalent_sequences,

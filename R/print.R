@@ -1,3 +1,4 @@
+# Print and formatting methods for board, roll, move, and study objects.
 #' Print a backgammon board
 #'
 #' @param x A `bg_board` object.

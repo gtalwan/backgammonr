@@ -1,3 +1,4 @@
+# Repeated Thompson-study helpers that compare budgets, seeds, and policy variants.
 #' Profile Thompson sampling over budgets and seeds
 #'
 #' `bg_ts_profile()` is the main repeated-study function for a single decision

@@ -30,6 +30,7 @@ struct ActionStats {
 // Posterior summaries are built row-wise here, then assembled into a data
 // frame for the R layer.
 struct PosteriorSummaryRow {
+  // This mirrors the columns returned by bg_cpp_posterior_summary().
   double estimate{NA_REAL};
   double posterior_sd{NA_REAL};
   double lower_95{NA_REAL};
@@ -41,6 +42,8 @@ struct PosteriorSummaryRow {
 };
 
 double clamp_unit_interval(const double x) {
+  // Many approximate posterior families can overshoot slightly; clamp the
+  // sampled or summarized value back to the bounded reward scale.
   if (!R_finite(x)) {
     return x;
   }
@@ -54,6 +57,8 @@ double clamp_unit_interval(const double x) {
 }
 
 double safe_sample_variance(const ActionStats& stats) {
+  // Reward-sum and reward-sum-of-squares are enough to reconstruct the usual
+  // unbiased sample variance when at least two rollouts are available.
   if (stats.allocation_count <= 1) {
     return NA_REAL;
   }
@@ -64,6 +69,8 @@ double safe_sample_variance(const ActionStats& stats) {
 }
 
 double safe_empirical_mean(const ActionStats& stats, const double fallback) {
+  // Use the empirical mean when observations exist, otherwise keep the caller's
+  // prior/default fallback.
   if (stats.allocation_count <= 0) {
     return fallback;
   }
@@ -71,6 +78,7 @@ double safe_empirical_mean(const ActionStats& stats, const double fallback) {
 }
 
 double list_number_or_default(const Rcpp::List& x, const char* name, const double fallback) {
+  // Optional prior fields use named-list lookup with a scalar fallback.
   if (!x.containsElementNamed(name)) {
     return fallback;
   }
@@ -85,6 +93,8 @@ Rcpp::NumericVector list_numeric_or_default(
     const Rcpp::List& x,
     const char* name,
     const Rcpp::NumericVector& fallback) {
+  // Same idea as list_number_or_default(), but for vector-valued priors such
+  // as Dirichlet alpha or scored payoff maps.
   if (!x.containsElementNamed(name)) {
     return fallback;
   }
@@ -108,6 +118,8 @@ std::vector<ActionStats> materialize_stats(
     const Rcpp::IntegerVector& backgammon_win,
     const Rcpp::NumericVector& reward_sum,
     const Rcpp::NumericVector& reward_sum_sq) {
+  // Convert parallel R vectors into one compact per-action array so the rest
+  // of the posterior code can work row-wise without repeated SEXP access.
   const int n_actions = allocation_count.size();
   if (wins.size() != n_actions ||
       losses.size() != n_actions ||
@@ -146,6 +158,8 @@ std::vector<ActionStats> materialize_stats(
 // Preserve the scored-outcome representation here so the Dirichlet path can
 // stay domain-faithful without extra R-side reshaping.
 Rcpp::NumericVector scored_category_counts(const ActionStats& stats) {
+  // Preserve the seven-category scored-outcome layout used by the categorical
+  // reward model.
   return Rcpp::NumericVector::create(
     static_cast<double>(stats.single_loss),
     static_cast<double>(stats.gammon_loss),
@@ -164,6 +178,8 @@ void effective_binary_counts(
     const double unresolved_value,
     double& success,
     double& failure) {
+  // Treat unresolved outcomes as fractional success/failure mass when the
+  // reward model collapses outcomes onto the unit interval.
   success = static_cast<double>(stats.wins) + unresolved_value * static_cast<double>(stats.unresolved);
   failure = static_cast<double>(stats.losses) + (1.0 - unresolved_value) * static_cast<double>(stats.unresolved);
 }
@@ -177,6 +193,8 @@ void normal_inverse_gamma_posterior(
     double& kappa_n,
     double& shape_n,
     double& scale_n) {
+  // Conjugate update for a normal mean with unknown variance. This is the core
+  // state update shared by the NIG and Student-t marginal samplers.
   const double mean0 = list_number_or_default(prior, "mean", 0.5);
   const double kappa0 = list_number_or_default(prior, "kappa", 1.0);
   const double shape0 = list_number_or_default(prior, "shape", 2.5);
@@ -193,6 +211,7 @@ void normal_inverse_gamma_posterior(
   const double n = static_cast<double>(stats.allocation_count);
   const double xbar = stats.reward_sum / n;
   const double centered_ss = std::max(0.0, stats.reward_sum_sq - n * xbar * xbar);
+  // centered_ss is the centered sum of squares around the empirical mean.
   kappa_n = kappa0 + n;
   mean_n = ((kappa0 * mean0) + (n * xbar)) / kappa_n;
   shape_n = shape0 + 0.5 * n;
@@ -202,6 +221,7 @@ void normal_inverse_gamma_posterior(
 double dirichlet_linear_variance(
     const Rcpp::NumericVector& alpha,
     const Rcpp::NumericVector& payoff) {
+  // Variance of a linear functional of a Dirichlet random vector.
   const double total = std::accumulate(alpha.begin(), alpha.end(), 0.0);
   if (!(total > 0.0)) {
     return NA_REAL;
@@ -218,6 +238,8 @@ double dirichlet_linear_variance(
 }
 
 Rcpp::NumericVector categorical_alpha_prior(const Rcpp::List& prior) {
+  // Default to the full seven-category scored-outcome prior unless the caller
+  // supplied a 3-category collapsed prior.
   return list_numeric_or_default(
     prior,
     "alpha",
@@ -226,6 +248,8 @@ Rcpp::NumericVector categorical_alpha_prior(const Rcpp::List& prior) {
 }
 
 Rcpp::NumericVector categorical_payoff_map(const Rcpp::List& prior, const double unresolved_value) {
+  // Choose the payoff map that converts categorical posterior draws into one
+  // scalar move value.
   if (!prior.containsElementNamed("payoff")) {
     const Rcpp::NumericVector alpha = categorical_alpha_prior(prior);
     if (alpha.size() == 3) {
@@ -240,6 +264,7 @@ Rcpp::NumericVector categorical_payoff_map(const Rcpp::List& prior, const double
 }
 
 Rcpp::NumericVector posterior_categorical_alpha(const ActionStats& stats, const Rcpp::List& prior) {
+  // Add observed category counts to the Dirichlet prior alpha vector.
   const Rcpp::NumericVector alpha0 = categorical_alpha_prior(prior);
   if (alpha0.size() == 3) {
     return Rcpp::NumericVector::create(
@@ -260,6 +285,7 @@ Rcpp::NumericVector posterior_categorical_alpha(const ActionStats& stats, const 
 }
 
 std::vector<int> ordered_index(const Rcpp::IntegerVector& x) {
+  // Stable ordering helper used by area-under-curve summaries.
   std::vector<int> ord(static_cast<std::size_t>(x.size()));
   std::iota(ord.begin(), ord.end(), 0);
   std::stable_sort(
@@ -276,6 +302,7 @@ double trapezoid_area_sorted(
     const Rcpp::IntegerVector& x,
     const Rcpp::NumericVector& y,
     const std::vector<int>& ord) {
+  // Numerical integration over an already-sorted checkpoint path.
   if (ord.empty()) {
     return NA_REAL;
   }
@@ -311,6 +338,8 @@ double sampled_bootstrap_mean(
     const double unresolved_value,
     const Rcpp::List& prior,
     const double smoothing) {
+  // Nonparametric bootstrap-style draw used as a robustness comparator rather
+  // than as an exact conjugate posterior family.
   if (stats.allocation_count <= 0) {
     if (reward_model == "win_loss") {
       return 0.5;
@@ -326,6 +355,8 @@ double sampled_bootstrap_mean(
 
   const double n = static_cast<double>(stats.allocation_count);
   if (reward_model == "win_loss") {
+    // Binary bootstrap path: resample an empirical Bernoulli mean with optional
+    // smoothing.
     double success = 0.0;
     double failure = 0.0;
     effective_binary_counts(stats, unresolved_value, success, failure);
@@ -338,6 +369,8 @@ double sampled_bootstrap_mean(
   }
 
   if (reward_model == "categorical_outcome") {
+    // Categorical bootstrap path: resample multinomial category counts and map
+    // them back to one payoff value.
     const Rcpp::NumericVector payoff = categorical_payoff_map(prior, unresolved_value);
     Rcpp::NumericVector counts = payoff.size() == 3
       ? Rcpp::NumericVector::create(
@@ -374,6 +407,8 @@ double sampled_bootstrap_mean(
   double p_unr = 1.0 / 3.0;
   double p_win = 1.0 / 3.0;
   if (denom > 0.0) {
+    // Scalar-payoff bootstrap treats loss/unresolved/win as a three-point
+    // empirical distribution.
     p_loss = (loss + smoothing) / denom;
     p_unr = (unr + smoothing) / denom;
     p_win = (win + smoothing) / denom;
@@ -392,13 +427,17 @@ double sample_posterior_value(
     const std::string& posterior_model,
     const double unresolved_value,
     const Rcpp::List& prior) {
+  // Sample one Thompson value for one action under the requested posterior
+  // family. Every higher-level TS method ultimately routes through this kernel.
   // Exact or pseudo-conjugate beta updates for binary / bounded scalar paths.
   if (posterior_model == "beta_bernoulli" || posterior_model == "beta_pseudo") {
     double success = 0.0;
     double failure = 0.0;
     if (posterior_model == "beta_bernoulli") {
+      // Exact conjugate update for binary rewards.
       effective_binary_counts(stats, unresolved_value, success, failure);
     } else {
+      // Pseudo-Beta path interprets scalar reward totals as fractional wins.
       success = stats.reward_sum;
       failure = static_cast<double>(stats.allocation_count) - stats.reward_sum;
     }
@@ -418,6 +457,7 @@ double sample_posterior_value(
     Rcpp::NumericVector gamma(alpha.size());
     double total = 0.0;
     for (int i = 0; i < alpha.size(); ++i) {
+      // Gamma-normalization is the standard way to sample a Dirichlet vector.
       gamma[i] = R::rgamma(alpha[i], 1.0);
       total += gamma[i];
     }
@@ -430,6 +470,7 @@ double sample_posterior_value(
   // Approximate scalar models keep the Thompson interface the same while
   // changing the posterior family under the hood.
   if (posterior_model == "gaussian_approx") {
+    // Normal approximation for the mean of a bounded scalar reward.
     const double mean0 = list_number_or_default(prior, "mean", 0.5);
     const double weight0 = list_number_or_default(prior, "weight", 1.0);
     const double variance_floor = list_number_or_default(prior, "variance_floor", 0.125);
@@ -447,6 +488,7 @@ double sample_posterior_value(
   }
 
   if (posterior_model == "normal_inverse_gamma") {
+    // Sample variance first, then conditional mean.
     double mean_n = 0.5;
     double kappa_n = 1.0;
     double shape_n = 2.5;
@@ -458,6 +500,8 @@ double sample_posterior_value(
   }
 
   if (posterior_model == "student_t_marginal") {
+    // Integrate out variance and draw directly from the Student-t marginal for
+    // the mean.
     double mean_n = 0.5;
     double kappa_n = 1.0;
     double shape_n = 2.5;
@@ -469,6 +513,7 @@ double sample_posterior_value(
   }
 
   if (posterior_model == "bootstrap") {
+    // Nonparametric robustness comparator.
     const double smoothing = list_number_or_default(prior, "smoothing", 0.0);
     return sampled_bootstrap_mean(stats, reward_model, unresolved_value, prior, smoothing);
   }
@@ -488,6 +533,8 @@ PosteriorSummaryRow summarize_action(
     const int action_index,
     const Rcpp::NumericVector& prob_best,
     const Rcpp::NumericVector& expected_regret) {
+  // Summarize one action's posterior with analytic moments where available and
+  // draw-based intervals otherwise.
   PosteriorSummaryRow row;
   row.prob_best = prob_best[action_index];
   row.expected_regret = expected_regret[action_index];
@@ -506,6 +553,7 @@ PosteriorSummaryRow summarize_action(
     const double total = row.alpha + row.beta;
     row.estimate = row.alpha / total;
     row.posterior_sd = std::sqrt((row.alpha * row.beta) / (total * total * (total + 1.0)));
+    // Beta-family intervals can be taken analytically from the Beta quantile.
     row.lower_95 = R::qbeta(0.025, row.alpha, row.beta, 1, 0);
     row.upper_95 = R::qbeta(0.975, row.alpha, row.beta, 1, 0);
     return row;
@@ -542,6 +590,8 @@ PosteriorSummaryRow summarize_action(
       ? std::sqrt(scale_n / ((shape_n - 1.0) * kappa_n))
       : NA_REAL;
   } else {
+    // For bootstrap and any other draw-only summaries, estimate mean and SD
+    // directly from the sampled draw matrix.
     const int n_draws = draw_matrix.nrow();
     double sum = 0.0;
     double sum_sq = 0.0;
@@ -557,6 +607,7 @@ PosteriorSummaryRow summarize_action(
   }
 
   std::vector<double> draws(draw_matrix.nrow());
+  // Empirical equal-tail intervals for the draw-based summary paths.
   for (int draw = 0; draw < draw_matrix.nrow(); ++draw) {
     draws[static_cast<std::size_t>(draw)] = draw_matrix(draw, action_index);
   }
@@ -589,6 +640,8 @@ Rcpp::NumericMatrix bg_cpp_posterior_sample_values(
     const double unresolved_value,
     const Rcpp::List& posterior_prior,
     const int draws) {
+  // Return the raw draw matrix so the R policy layer can implement several TS
+  // variants without rebuilding sufficient statistics.
   if (draws < 1) {
     Rcpp::stop("`draws` must be at least 1.");
   }
@@ -610,9 +663,8 @@ Rcpp::NumericMatrix bg_cpp_posterior_sample_values(
   );
   const int n_actions = allocation_count.size();
   Rcpp::NumericMatrix out(draws, n_actions);
-  // Return the raw draw matrix so the R policy layer can implement several TS
-  // variants without repeated stat reconstruction.
   for (int action = 0; action < n_actions; ++action) {
+    // Column j contains repeated Thompson draws for action j.
     for (int draw = 0; draw < draws; ++draw) {
       out(draw, action) = sample_posterior_value(
         stats[static_cast<std::size_t>(action)],
@@ -645,6 +697,8 @@ Rcpp::DataFrame bg_cpp_posterior_summary(
     const double unresolved_value,
     const Rcpp::List& posterior_prior,
     const int draws) {
+  // Export one regular posterior summary table from the same draw matrix used
+  // by Thompson selection.
   if (draws < 2) {
     Rcpp::stop("`draws` must be at least 2 for posterior summaries.");
   }
@@ -690,6 +744,8 @@ Rcpp::DataFrame bg_cpp_posterior_summary(
   // Probability-best and model-relative expected regret are both Monte Carlo
   // summaries of the same draw matrix.
   for (int draw = 0; draw < draw_matrix.nrow(); ++draw) {
+    // Identify the best action in this posterior world, then compare every
+    // action to that draw-specific optimum.
     double best_value = draw_matrix(draw, 0);
     int best_index = 0;
     for (int action = 1; action < n_actions; ++action) {
@@ -714,6 +770,7 @@ Rcpp::DataFrame bg_cpp_posterior_summary(
   Rcpp::NumericVector beta(n_actions, NA_REAL);
 
   for (int action = 0; action < n_actions; ++action) {
+    // Assemble one summary row per action from the shared draw matrix.
     const PosteriorSummaryRow row = summarize_action(
       stats[static_cast<std::size_t>(action)],
       reward_model,
@@ -753,6 +810,7 @@ Rcpp::DataFrame bg_cpp_reference_summary(
     const Rcpp::NumericVector& reward_sum_sq,
     const double prior_alpha,
     const double prior_beta) {
+  // Export compact Monte Carlo summaries for the high-budget proxy reference.
   const int n_actions = allocation_count.size();
   if (unresolved.size() != n_actions ||
       reward_sum.size() != n_actions ||
@@ -775,6 +833,8 @@ Rcpp::DataFrame bg_cpp_reference_summary(
   for (int i = 0; i < n_actions; ++i) {
     const double n = static_cast<double>(allocation_count[i]);
     if (n > 0.0) {
+      // Proxy reference uses realized rollout rewards only; no posterior draw
+      // machinery is involved here.
       reference_mean[i] = reward_sum[i] / n;
       reference_alpha[i] = prior_alpha + reward_sum[i];
       reference_beta[i] = prior_beta + (n - reward_sum[i]);
@@ -811,6 +871,8 @@ Rcpp::List bg_cpp_eval_path_metrics(
     const Rcpp::LogicalVector& epsilon_optimal,
     const Rcpp::NumericVector& simple_regret,
     const Rcpp::NumericVector& recommended_prob_best) {
+  // Export budget-path efficiency and calibration summaries from one ordered
+  // sequence of checkpoints.
   const int n = checkpoint.size();
   if (runtime_seconds.size() != n ||
       top1_match.size() != n ||
@@ -852,6 +914,8 @@ Rcpp::List bg_cpp_eval_path_metrics(
       max_runtime_seconds = runtime_seconds[idx];
     }
     if (top1_match[idx] != NA_LOGICAL && R_finite(recommended_prob_best[idx])) {
+      // Brier score compares reported probability-best with realized 0/1
+      // top-1 correctness.
       const double outcome = top1_match[idx] ? 1.0 : 0.0;
       const double diff = clamp_unit_interval(recommended_prob_best[idx]) - outcome;
       brier_sum += diff * diff;
@@ -882,6 +946,8 @@ Rcpp::DataFrame bg_cpp_calibration_summary(
     const Rcpp::NumericVector& predicted_prob,
     const Rcpp::NumericVector& observed_top1,
     const int bins) {
+  // Bin predicted probability-best values and compare them with actual top-1
+  // correctness rates to produce reliability-style calibration summaries.
   const int n = predicted_prob.size();
   if (observed_top1.size() != n) {
     Rcpp::stop("Calibration inputs must have the same length.");
@@ -916,6 +982,7 @@ Rcpp::DataFrame bg_cpp_calibration_summary(
       bin_id = bins - 1;
     }
     count[bin_id] += 1;
+    // Accumulate both calibration and Brier components per bin.
     sum_predicted[bin_id] += p;
     sum_observed[bin_id] += y;
     const double diff = p - y;

@@ -1,3 +1,4 @@
+# Legacy statistical-API aliases preserved for older external code paths.
 #' Initialize a board state
 #'
 #' Alias for [bg_position()] in the research-oriented API.

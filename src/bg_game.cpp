@@ -16,6 +16,8 @@
 
 namespace {
 
+// The game layer validates players and RNG-sensitive selections at the outer
+// boundary, then delegates to faster unchecked helpers internally.
 void validate_player(const int player) {
   if (player != 1 && player != -1) {
     throw std::range_error("`player` must be either 1L or -1L.");
@@ -23,6 +25,8 @@ void validate_player(const int player) {
 }
 
 bool selection_uses_randomness(const std::string& selection) {
+  // Mirror the public selection registry so exported entry points know whether
+  // to initialize an RNG.
   return backgammonr::selection_uses_randomness(selection);
 }
 
@@ -30,6 +34,7 @@ bool player_has_checker_in_home_board(
     const backgammonr::BoardState& board,
     const int player,
     const int home_owner) {
+  // Used for gammon/backgammon classification once the game ends.
   for (int point = 1; point <= backgammonr::kNumPoints; ++point) {
     if (!backgammonr::is_home_point(home_owner, point)) {
       continue;
@@ -42,12 +47,15 @@ bool player_has_checker_in_home_board(
 }
 
 void validate_max_turns(const int max_turns) {
+  // Negative limits are always invalid; zero is allowed for explicit
+  // unresolved/truncated rollouts.
   if (max_turns < 0) {
     throw std::range_error("`max_turns` must be nonnegative.");
   }
 }
 
 std::mt19937 init_rng(const int seed, const bool use_seed) {
+  // Match RNG semantics across exported random-turn and random-game helpers.
   std::mt19937 rng;
 
   if (use_seed) {
@@ -64,6 +72,7 @@ std::mt19937 init_rng(const int seed, const bool use_seed) {
 }
 
 std::vector<backgammonr::DiceRoll> parse_roll_vector(const Rcpp::List& rolls) {
+  // Parse a scripted roll sequence for deterministic game playback.
   std::vector<backgammonr::DiceRoll> out;
   out.reserve(rolls.size());
 
@@ -85,12 +94,15 @@ const std::string& selection_for_player_unchecked(
     const int player,
     const std::string& player1_selection,
     const std::string& player2_selection) {
+  // Cheap player-to-policy routing used inside game loops.
   return player == 1 ? player1_selection : player2_selection;
 }
 
 std::string shared_or_mixed_label(
     const std::string& player1_selection,
     const std::string& player2_selection) {
+  // Label same-policy matchups with the policy name and mixed matchups with a
+  // neutral tag for downstream summaries.
   if (player1_selection == player2_selection) {
     return player1_selection;
   }
@@ -101,6 +113,8 @@ std::string shared_or_mixed_label(
 backgammonr::BoardState apply_sequence_without_full_validation(
     const backgammonr::BoardState& board,
     const backgammonr::MoveSequence& sequence) {
+  // Legal sequences from the move generator can be applied directly inside the
+  // turn/game engine without re-validating each step.
   backgammonr::BoardState out = board;
 
   for (const backgammonr::MoveStep& step : sequence.steps) {
@@ -115,10 +129,12 @@ backgammonr::BoardState apply_sequence_without_full_validation(
 namespace backgammonr {
 
 bool board_is_terminal(const BoardState& board) {
+  // A game ends as soon as either side has borne off all 15 checkers.
   return board.off[0] == kCheckersPerPlayer || board.off[1] == kCheckersPerPlayer;
 }
 
 int board_winner(const BoardState& board) {
+  // Return +1, -1, or 0 for non-terminal boards.
   if (board.off[0] == kCheckersPerPlayer && board.off[1] == kCheckersPerPlayer) {
     throw std::range_error("Invalid terminal board: both players cannot have borne off all checkers.");
   }
@@ -135,6 +151,8 @@ int board_winner(const BoardState& board) {
 }
 
 TerminalScoreClass terminal_score_class(const BoardState& board, const int perspective_player) {
+  // Convert a terminal board into single/gammon/backgammon classes from one
+  // player's perspective.
   validate_player(perspective_player);
 
   if (!board_is_terminal(board)) {
@@ -163,6 +181,7 @@ TerminalScoreClass terminal_score_class(const BoardState& board, const int persp
 }
 
 std::string terminal_score_class_label(const TerminalScoreClass score_class) {
+  // Public string labels shared by the rollout and truth layers.
   switch (score_class) {
     case TerminalScoreClass::kSingleLoss:
       return "single_loss";
@@ -184,6 +203,7 @@ std::string terminal_score_class_label(const TerminalScoreClass score_class) {
 }
 
 BoardState apply_move_sequence_to_board(const BoardState& board, const MoveSequence& sequence) {
+  // Checked full-turn application used by the exported move-application API.
   validate_player(sequence.player);
 
   if (board_is_terminal(board)) {
@@ -228,6 +248,7 @@ MoveSequence choose_move_sequence(
     const std::string& selection,
     std::mt19937* rng,
     const RolloutConfig& rollout_config) {
+  // Route one legal-move set through the named selection policy.
   validate_selection(selection);
 
   if (legal_moves.empty()) {
@@ -269,6 +290,8 @@ TurnResult play_turn_with_roll(
     const std::string& selection,
     std::mt19937* rng,
     const RolloutConfig& rollout_config) {
+  // Core turn kernel: generate legal moves, choose one under the requested
+  // policy, then advance the board by one full turn.
   validate_selection(selection);
 
   if (board_is_terminal(board)) {
@@ -301,6 +324,7 @@ TurnResult play_turn_with_roll(
 }
 
 TurnResult play_turn_random(const BoardState& board, std::mt19937& rng, const std::string& selection, const RolloutConfig& rollout_config) {
+  // Convenience wrapper for one turn with a fresh IID roll.
   return play_turn_with_roll(board, roll_dice(rng), selection, &rng, rollout_config);
 }
 
@@ -310,6 +334,7 @@ GameResult play_game_random(
     std::mt19937& rng,
     const std::string& selection,
     const RolloutConfig& rollout_config) {
+  // Same-policy matchup convenience wrapper.
   return play_game_random_matchup(initial_board, max_turns, rng, selection, selection, rollout_config);
 }
 
@@ -320,6 +345,7 @@ GameResult play_game_with_rolls(
     const std::string& selection,
     std::mt19937* rng,
     const RolloutConfig& rollout_config) {
+  // Same-policy scripted-roll convenience wrapper.
   return play_game_with_rolls_matchup(initial_board, rolls, max_turns, selection, selection, rng, rollout_config);
 }
 
@@ -330,6 +356,8 @@ GameResult play_game_random_matchup(
     const std::string& player1_selection,
     const std::string& player2_selection,
     const RolloutConfig& rollout_config) {
+  // Simulate a full game under IID rolls and possibly different player
+  // selection policies.
   validate_selection(player1_selection);
   validate_selection(player2_selection);
   validate_max_turns(max_turns);
@@ -377,6 +405,8 @@ GameResult play_game_with_rolls_matchup(
     const std::string& player2_selection,
     std::mt19937* rng,
     const RolloutConfig& rollout_config) {
+  // Simulate a full game against a scripted roll sequence, optionally with RNG
+  // only for random/rollout-based move choice.
   validate_selection(player1_selection);
   validate_selection(player2_selection);
   validate_max_turns(max_turns);
@@ -423,6 +453,7 @@ GameResult play_game_with_rolls_matchup(
 }
 
 Rcpp::List turn_result_to_list(const TurnResult& result) {
+  // Normalize one turn result for the R-facing API and diagnostics.
   Rcpp::List legal_moves(result.legal_moves.size());
   for (int i = 0; i < static_cast<int>(result.legal_moves.size()); ++i) {
     legal_moves[i] = move_sequence_to_list(result.legal_moves[i]);
@@ -449,6 +480,7 @@ Rcpp::List turn_result_to_list(const TurnResult& result) {
 }
 
 Rcpp::List game_result_to_list(const GameResult& result) {
+  // Normalize a whole simulated game for the R-facing API.
   Rcpp::List turns(result.turns.size());
   for (int i = 0; i < static_cast<int>(result.turns.size()); ++i) {
     turns[i] = turn_result_to_list(result.turns[i]);
@@ -474,6 +506,7 @@ Rcpp::List game_result_to_list(const GameResult& result) {
 
 // [[Rcpp::export]]
 std::string bg_cpp_terminal_score_class(const Rcpp::List& board, const int perspective_player) {
+  // Exported terminal-score classifier used by rollout summarizers.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   return backgammonr::terminal_score_class_label(
     backgammonr::terminal_score_class(parsed_board, perspective_player)
@@ -482,6 +515,7 @@ std::string bg_cpp_terminal_score_class(const Rcpp::List& board, const int persp
 
 // [[Rcpp::export]]
 Rcpp::List bg_cpp_apply_move_sequence(const Rcpp::List& board, const Rcpp::List& move_sequence) {
+  // Exported checked move application entry point.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const backgammonr::MoveSequence parsed_sequence = backgammonr::parse_move_sequence_list(move_sequence);
   return backgammonr::board_to_list(backgammonr::apply_move_sequence_to_board(parsed_board, parsed_sequence));
@@ -494,6 +528,7 @@ Rcpp::List bg_cpp_play_turn_with_roll(
     const std::string& selection,
     const int seed,
     const bool use_seed) {
+  // Exported single-turn simulator with an explicit root roll.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const backgammonr::DiceRoll parsed_roll = backgammonr::parse_roll_list(roll);
 
@@ -514,6 +549,7 @@ Rcpp::List bg_cpp_play_turn_random(
     const std::string& selection,
     const int seed,
     const bool use_seed) {
+  // Exported single-turn simulator with a fresh IID roll.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   std::mt19937 rng = init_rng(seed, use_seed);
 
@@ -527,6 +563,7 @@ Rcpp::List bg_cpp_play_game_random(
     const std::string& selection,
     const int seed,
     const bool use_seed) {
+  // Exported same-policy random-roll game simulator.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   std::mt19937 rng = init_rng(seed, use_seed);
 
@@ -542,6 +579,7 @@ Rcpp::List bg_cpp_play_game_scripted(
     const std::string& selection,
     const int seed,
     const bool use_seed) {
+  // Exported same-policy scripted-roll game simulator.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::DiceRoll> parsed_rolls = parse_roll_vector(rolls);
 
@@ -564,6 +602,7 @@ Rcpp::List bg_cpp_play_game_matchup_random(
     const std::string& player2_selection,
     const int seed,
     const bool use_seed) {
+  // Exported two-policy matchup simulator under IID rolls.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   std::mt19937 rng = init_rng(seed, use_seed);
 
@@ -580,6 +619,7 @@ Rcpp::List bg_cpp_play_game_matchup_scripted(
     const std::string& player2_selection,
     const int seed,
     const bool use_seed) {
+  // Exported two-policy matchup simulator under scripted rolls.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const std::vector<backgammonr::DiceRoll> parsed_rolls = parse_roll_vector(rolls);
 
@@ -612,6 +652,7 @@ Rcpp::List bg_cpp_play_turn_with_roll_rollout(
     const int max_rollout_turns,
     const int seed,
     const bool use_seed) {
+  // Exported turn simulator that evaluates rollout-family move selectors.
   const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
   const backgammonr::DiceRoll parsed_roll = backgammonr::parse_roll_list(roll);
   std::mt19937 rng = init_rng(seed, use_seed);

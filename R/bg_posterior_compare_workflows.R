@@ -1,5 +1,7 @@
 # Repeated-study workflows for posterior-family and reward-stack comparisons.
 bg_default_reward_model_map <- function() {
+  # Default one-to-one mapping from reward definitions to their canonical
+  # posterior families for reward-stack comparisons.
   c(
     scalar_payoff = "beta_pseudo",
     categorical_outcome = "dirichlet_multinomial",
@@ -8,6 +10,8 @@ bg_default_reward_model_map <- function() {
 }
 
 bg_posterior_compare_summary <- function(results) {
+  # Collapse repeated-seed checkpoint results to one mean summary table per
+  # method and budget.
   summary <- aggregate(
     results[, c(
       "recommended_prob_best",
@@ -49,6 +53,7 @@ bg_compare_posteriors <- function(
     save_path = NULL,
     overwrite = FALSE,
     ...) {
+  # Compare posterior families while holding the reward model fixed.
   cached <- bg_maybe_load_saved_study(save_path, overwrite = overwrite)
   if (!is.null(cached)) {
     return(cached)
@@ -223,6 +228,7 @@ bg_compare_reward_models <- function(
     save_path = NULL,
     overwrite = FALSE,
     ...) {
+  # Compare coherent reward/posterior stacks under one common study protocol.
   cached <- bg_maybe_load_saved_study(save_path, overwrite = overwrite)
   if (!is.null(cached)) {
     return(cached)

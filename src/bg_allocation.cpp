@@ -1,3 +1,4 @@
+// Legacy scalar allocation engine for equal, UCB, Thompson, TTTS, and OCBA paths.
 // [[Rcpp::depends(RcppArmadillo)]]
 #include <RcppArmadillo.h>
 // Core statistical-allocation engine.
@@ -36,6 +37,8 @@
 
 namespace {
 
+// Outcome encoding keeps the allocation engine independent from the higher-level
+// R reward labels while still supporting bounded scalar payoff accounting.
 // Outcome encoding used for rollout reward accounting.
 enum class RolloutOutcome {
   kWin,
@@ -70,6 +73,8 @@ struct CollapsedCandidate {
 };
 
 struct AllocationTraceRow {
+  // Trace rows are emitted in long format: one row per candidate per checkpoint
+  // so the R layer can facet and filter without rebuilding history tables.
   // Snapshot metadata.
   int checkpoint{0};
   int selected_candidate{NA_INTEGER};
@@ -250,6 +255,8 @@ void update_summary(
   } else if (outcome == RolloutOutcome::kLoss) {
     summary.losses += 1;
   } else {
+    // Unresolved outcomes still consume budget and still contribute fractional
+    // reward through the configured unresolved payoff.
     summary.unresolved += 1;
   }
 
@@ -269,6 +276,7 @@ double sample_beta_distribution(const double alpha, const double beta, std::mt19
 
   std::gamma_distribution<double> gamma_alpha(alpha, 1.0);
   std::gamma_distribution<double> gamma_beta(beta, 1.0);
+  // Sample a Beta draw by normalizing two independent Gamma variates.
   const double x = gamma_alpha(rng);
   const double y = gamma_beta(rng);
 
@@ -433,6 +441,8 @@ struct BoardStateKey {
 
 struct BoardStateKeyHash {
   std::size_t operator()(const BoardStateKey& key) const {
+    // Simple rolling hash across all board fields. This is only used for local
+    // candidate deduplication, not for persistent serialization.
     std::size_t h = static_cast<std::size_t>(key.turn * 1315423911U);
 
     for (const int value : key.points) {
@@ -515,6 +525,7 @@ void compute_posterior_diagnostics(
   arma::vec regret_sum(n, arma::fill::zeros);
 
   for (int draw_idx = 0; draw_idx < kPosteriorDiagnosticDraws; ++draw_idx) {
+    // Each Monte Carlo pass samples one posterior world across all candidates.
     int best_index = 0;
     double best_value = -std::numeric_limits<double>::infinity();
 
@@ -564,6 +575,8 @@ void refresh_summary_fields(
   arma::vec beta(n);
 
   for (int i = 0; i < n; ++i) {
+    // Materialize the summary vector into dense numeric arrays so the posterior
+    // updates and interval calculations stay vectorized.
     counts[i] = static_cast<double>(summaries[i].allocation_count);
     wins[i] = static_cast<double>(summaries[i].wins);
     unresolved[i] = static_cast<double>(summaries[i].unresolved);
@@ -574,12 +587,16 @@ void refresh_summary_fields(
   const arma::vec posterior_mean = alpha / (alpha + beta);
   const arma::vec posterior_var =
       (alpha % beta) / (arma::square(alpha + beta) % (alpha + beta + 1.0));
+  // Normal-approximation intervals are cheap and sufficient for this legacy
+  // scalar engine; the richer explicit-posterior path lives elsewhere.
   const arma::vec posterior_sd = arma::sqrt(arma::clamp(posterior_var, 0.0, 1.0));
   const arma::vec lower_95 = arma::clamp(posterior_mean - 1.96 * posterior_sd, 0.0, 1.0);
   const arma::vec upper_95 = arma::clamp(posterior_mean + 1.96 * posterior_sd, 0.0, 1.0);
 
   for (int i = 0; i < n; ++i) {
     if (summaries[i].allocation_count > 0) {
+      // Empirical value is the realized bounded payoff average, not the
+      // posterior mean.
       summaries[i].empirical_value =
           (wins[i] + config.unresolved_value * unresolved[i]) /
           counts[i];
@@ -597,6 +614,8 @@ void refresh_summary_fields(
   if (policy == AllocationPolicy::kUcb) {
     const double total = static_cast<double>(std::max(total_allocations, 1));
     const arma::vec denom = arma::max(counts, arma::ones<arma::vec>(n));
+    // UCB bonus shrinks with repeated sampling and grows slowly with total
+    // budget spent.
     const arma::vec bonus = config.ucb_exploration *
         arma::sqrt(std::log(total + 1.0) / denom);
 
@@ -718,6 +737,8 @@ arma::vec ocba_target_allocations(
   arma::vec mu(n);
   arma::vec sigma(n);
   for (int i = 0; i < n; ++i) {
+    // OCBA uses posterior means and posterior standard deviations as plug-in
+    // surrogates for the unknown true means and variances.
     const double alpha = summaries[i].alpha;
     const double beta = summaries[i].beta;
     mu[i] = alpha / (alpha + beta);
@@ -739,6 +760,7 @@ arma::vec ocba_target_allocations(
     if (i == best) {
       continue;
     }
+    // Non-best candidates get ratio proportional to variance / gap^2.
     const double gap = std::max(mu_best - mu[i], 1e-6);
     ratio[i] = (sigma[i] * sigma[i]) / (gap * gap);
   }
@@ -748,6 +770,8 @@ arma::vec ocba_target_allocations(
     if (i == best) {
       continue;
     }
+    // Best candidate allocation is backed out from the OCBA normalization
+    // identity once all challenger ratios are known.
     sum_term += (ratio[i] * ratio[i]) / std::max(sigma[i] * sigma[i], 1e-12);
   }
   ratio[best] = std::max(sigma[best] * std::sqrt(std::max(sum_term, 1e-12)), 1e-12);
@@ -799,6 +823,7 @@ int choose_next_candidate(
     double best_deficit = target[0] - static_cast<double>(summaries[0].allocation_count);
     for (int i = 1; i < n; ++i) {
       const double deficit = target[i] - static_cast<double>(summaries[i].allocation_count);
+      // OCBA chooses the candidate currently farthest below its target budget.
       if (deficit > best_deficit + kTieTolerance) {
         chosen = i;
         best_deficit = deficit;
@@ -819,6 +844,8 @@ int choose_next_candidate(
     // 2) with probability beta play I,
     // 3) otherwise draw again until top action J != I and play J.
     auto draw_thompson_winner = [&](void) -> int {
+      // TTTS still starts by sampling one Thompson winner from the current
+      // posterior.
       int winner = 0;
       double best = -std::numeric_limits<double>::infinity();
       for (int i = 0; i < n; ++i) {
@@ -843,10 +870,12 @@ int choose_next_candidate(
 
     std::uniform_real_distribution<double> coin(0.0, 1.0);
     if (coin(rng) <= beta) {
+      // With probability beta, TTTS allocates to the first Thompson winner.
       return top1;
     }
 
     for (int attempt = 0; attempt < 64; ++attempt) {
+      // Otherwise keep drawing until a distinct second winner appears.
       const int top2 = draw_thompson_winner();
       if (top2 != top1) {
         return top2;
@@ -883,6 +912,8 @@ int choose_next_candidate(
       score = sample_beta_distribution(summary.alpha, summary.beta, rng);
     }
 
+    // Shared incumbent comparison keeps the tie-breaking rule consistent across
+    // greedy, UCB, and Thompson.
     if (score_beats_incumbent(score, summary.allocation_count, best_score, best_allocations)) {
       best_index = i;
       best_score = score;
@@ -923,6 +954,8 @@ std::vector<backgammonr::ActionEvaluationSummary> evaluate_with_optional_trace(
 
   const std::vector<CollapsedCandidate> collapsed =
       collapse_equivalent_candidates(board, legal_moves);
+  // Once root candidates are collapsed, the rest of the allocation engine only
+  // reasons about unique successor boards.
 
   std::vector<backgammonr::ActionEvaluationSummary> summaries(collapsed.size());
   std::vector<backgammonr::BoardState> candidate_boards;
@@ -955,6 +988,8 @@ std::vector<backgammonr::ActionEvaluationSummary> evaluate_with_optional_trace(
   const std::uint32_t crn_base_seed = config.use_crn_seed
       ? static_cast<std::uint32_t>(config.crn_seed)
       : static_cast<std::uint32_t>(rng());
+  // CRN mode reuses this one base seed and then derives per-sample streams by
+  // sample index so candidates see aligned random futures.
 
   int step = 0;
   // Snapshot helper: emit checkpoints only when requested.
@@ -982,6 +1017,8 @@ std::vector<backgammonr::ActionEvaluationSummary> evaluate_with_optional_trace(
           crn_rng.seed(stable_rollout_seed(crn_base_seed, sample_index, 0));
           rollout_rng = &crn_rng;
         }
+        // Each warm-start rollout updates only the chosen candidate's
+        // sufficient statistics.
         const RolloutOutcome outcome = single_rollout_outcome(
             candidate_boards[i],
             acting_players[i],
@@ -1002,6 +1039,8 @@ std::vector<backgammonr::ActionEvaluationSummary> evaluate_with_optional_trace(
     // Policy decides which candidate gets next rollout.
     const int chosen_index =
         choose_next_candidate(summaries, policy, step, config, rng);
+    // Sample index is candidate-specific because each action maintains its own
+    // rollout count and therefore its own CRN/stratification schedule.
     const int sample_index = summaries[chosen_index].allocation_count + 1;
     const int offset = config.crn ? 0 : stratification_offsets[chosen_index];
     const ForcedRollSchedule forced_rolls =
@@ -1009,6 +1048,7 @@ std::vector<backgammonr::ActionEvaluationSummary> evaluate_with_optional_trace(
     std::mt19937* rollout_rng = &rng;
     std::mt19937 crn_rng;
     if (config.crn) {
+      // Under CRN, every candidate's kth rollout reuses the same derived seed.
       crn_rng.seed(stable_rollout_seed(crn_base_seed, sample_index, 0));
       rollout_rng = &crn_rng;
     }
@@ -1069,6 +1109,7 @@ std::string canonicalize_allocation_method(const std::string& method) {
   validate_allocation_method(method);
 
   if (method == "equal" || method == "rollout" || method == "equal_rollout") {
+    // Plain rollout aliases map to equal allocation over candidate moves.
     return "equal";
   }
 
@@ -1133,6 +1174,8 @@ int best_candidate_index(const std::vector<ActionEvaluationSummary>& summaries) 
           ? -std::numeric_limits<double>::infinity()
           : summaries[best_index].empirical_value;
 
+      // Secondary tie-break uses empirical value, then raw allocation count, so
+      // recommendations remain deterministic.
       if (current_empirical > best_empirical + 1e-12) {
         best_index = i;
         continue;
@@ -1204,6 +1247,8 @@ Rcpp::DataFrame action_evaluation_summaries_to_data_frame(
   Rcpp::NumericVector selection_score(n);
 
   for (int i = 0; i < n; ++i) {
+    // Copy struct fields column-wise so the R layer gets one rectangular table
+    // with no further reshaping required.
     candidate_index[i] = summaries[i].candidate_index;
     n_equivalent_sequences[i] = summaries[i].n_equivalent_sequences;
     allocation_count[i] = summaries[i].allocation_count;
@@ -1269,6 +1314,8 @@ Rcpp::DataFrame allocation_trace_rows_to_data_frame(
   Rcpp::NumericVector selection_score(n);
 
   for (int i = 0; i < n; ++i) {
+    // Same columnar conversion pattern as action summaries, but for the long
+    // checkpoint trace.
     checkpoint[i] = trace_rows[i].checkpoint;
     selected_candidate[i] = trace_rows[i].selected_candidate;
     leader_index[i] = trace_rows[i].leader_index;
@@ -1346,6 +1393,7 @@ Rcpp::List bg_cpp_allocation_evaluate(
       seed,
       use_seed,
       fast_diagnostics};
+  // The legacy allocation engine uses one local RNG stream per exported call.
   // Local RNG stream for this evaluation call.
   std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
 
@@ -1407,6 +1455,7 @@ Rcpp::List bg_cpp_allocation_evaluate_trace(
       seed,
       use_seed,
       fast_diagnostics};
+  // Trace mode runs the same allocation engine but keeps checkpoint snapshots.
   std::mt19937 rng = backgammonr::init_rng(seed, use_seed);
   std::vector<AllocationTraceRow> trace_rows;
   // Reserve worst-case order-of-magnitude to reduce trace vector growth.
@@ -1489,6 +1538,8 @@ Rcpp::List bg_cpp_profile_rollout_runtime(
   }
 
   const backgammonr::MoveSequence first_move = legal_moves.front();
+  // Profiling uses the first legal move only for micro-benchmarks of move
+  // application and one-rollout cost.
 
   // Time move application hot path.
   tic = std::chrono::steady_clock::now();
