@@ -1,3 +1,4 @@
+// Core backgammon rule helpers shared across engine components.
 #include "bg_rules.h"
 
 #include <algorithm>

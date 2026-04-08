@@ -1,3 +1,4 @@
+# Legacy Thompson-research helpers retained for compatibility.
 bg_match_thompson_method <- function(method) {
   match.arg(method, choices = c("thompson", "ttts"))
 }
@@ -62,7 +63,6 @@ bg_evaluate_thompson_family <- function(
 #'   reference top-two gap is moderate/large.
 #' - Repeated leader switches at late checkpoints can indicate a hard state or
 #'   insufficient budget.
-#' @export
 trace_thompson_allocation <- function(
     board,
     roll,
@@ -197,7 +197,6 @@ trace_thompson_allocation <- function(
 #'   near-tie settings.
 #' - Use `reference_certified`/`difficulty_label` to gauge how confidently the
 #'   reference separates the top actions.
-#' @export
 compare_thompson_to_reference <- function(
     board,
     roll,
@@ -393,7 +392,6 @@ compare_thompson_to_reference <- function(
 #' @return A list of class `bg_reference_certificate` with:
 #'   - `certificate`: one-row data frame;
 #'   - `reference`: the reference evaluation object.
-#' @export
 certify_reference_truth <- function(
     reference = NULL,
     board = NULL,
@@ -515,7 +513,6 @@ certify_reference_truth <- function(
 #'
 #' @return A `bg_thompson_benchmark` object (inherits from
 #'   `bg_allocation_benchmark`) with an added `thompson_focus` summary.
-#' @export
 benchmark_thompson <- function(
     cases,
     budgets = c(128L, 512L, 2048L),
@@ -577,7 +574,6 @@ benchmark_thompson <- function(
 #'
 #' @return A list of class `bg_thompson_benchmark_summary` containing
 #'   Thompson-specific and baseline comparison tables.
-#' @export
 summarize_thompson_benchmark <- function(x) {
   if (!inherits(x, "bg_allocation_benchmark")) {
     stop("`x` must inherit from class 'bg_allocation_benchmark'.", call. = FALSE)
@@ -670,7 +666,6 @@ summarize_thompson_benchmark <- function(x) {
 #' @param ... Unused.
 #'
 #' @return The plotted trace data frame, invisibly.
-#' @export
 plot_thompson_convergence <- function(
     x,
     top_n = 4L,
@@ -759,7 +754,6 @@ plot_thompson_convergence <- function(
 #' @param ... Unused.
 #'
 #' @return Benchmark summary rows used in the plot, invisibly.
-#' @export
 plot_thompson_vs_baselines <- function(
     x,
     metric = c("correct_selection_rate", "mean_simple_regret", "mean_mse", "mean_runtime_seconds"),
@@ -826,7 +820,6 @@ plot_thompson_vs_baselines <- function(
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_thompson_trace <- function(x, n = 10L, ...) {
   if (!inherits(x, "bg_thompson_trace")) {
     stop("`x` must inherit from class 'bg_thompson_trace'.", call. = FALSE)
@@ -865,7 +858,6 @@ print.bg_thompson_trace <- function(x, n = 10L, ...) {
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_thompson_reference_comparison <- function(x, n_actions = 10L, ...) {
   if (!inherits(x, "bg_thompson_reference_comparison")) {
     stop("`x` must inherit from class 'bg_thompson_reference_comparison'.", call. = FALSE)
@@ -971,7 +963,6 @@ print.bg_thompson_reference_comparison <- function(x, n_actions = 10L, ...) {
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_reference_certificate <- function(x, ...) {
   if (!inherits(x, "bg_reference_certificate")) {
     stop("`x` must inherit from class 'bg_reference_certificate'.", call. = FALSE)
@@ -1001,7 +992,6 @@ print.bg_reference_certificate <- function(x, ...) {
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_thompson_benchmark <- function(x, n = 20L, ...) {
   if (!inherits(x, "bg_thompson_benchmark")) {
     stop("`x` must inherit from class 'bg_thompson_benchmark'.", call. = FALSE)
@@ -1027,7 +1017,6 @@ print.bg_thompson_benchmark <- function(x, n = 20L, ...) {
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_thompson_benchmark_summary <- function(x, n = 20L, ...) {
   if (!inherits(x, "bg_thompson_benchmark_summary")) {
     stop("`x` must inherit from class 'bg_thompson_benchmark_summary'.", call. = FALSE)

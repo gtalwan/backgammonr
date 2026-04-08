@@ -45,6 +45,10 @@ bg_cpp_roll_dice <- function(n, seed, use_seed) {
     .Call(`_backgammonr_bg_cpp_roll_dice`, n, seed, use_seed)
 }
 
+bg_cpp_terminal_score_class <- function(board, perspective_player) {
+    .Call(`_backgammonr_bg_cpp_terminal_score_class`, board, perspective_player)
+}
+
 bg_cpp_apply_move_sequence <- function(board, move_sequence) {
     .Call(`_backgammonr_bg_cpp_apply_move_sequence`, board, move_sequence)
 }
@@ -123,6 +127,30 @@ bg_cpp_move_sequence_create_with_roll <- function(player, steps, roll) {
 
 bg_cpp_legal_moves <- function(board, player, roll) {
     .Call(`_backgammonr_bg_cpp_legal_moves`, board, player, roll)
+}
+
+bg_cpp_rollout_blocks <- function(board, legal_moves, candidate_index, block_rollouts, start_counts, rollout_policy, max_rollout_turns, unresolved_value, dice_mode, crn, task_block_size, seed, use_seed) {
+    .Call(`_backgammonr_bg_cpp_rollout_blocks`, board, legal_moves, candidate_index, block_rollouts, start_counts, rollout_policy, max_rollout_turns, unresolved_value, dice_mode, crn, task_block_size, seed, use_seed)
+}
+
+bg_cpp_posterior_sample_values <- function(allocation_count, wins, losses, single_loss, gammon_loss, backgammon_loss, unresolved, single_win, gammon_win, backgammon_win, reward_sum, reward_sum_sq, reward_model, posterior_model, unresolved_value, posterior_prior, draws) {
+    .Call(`_backgammonr_bg_cpp_posterior_sample_values`, allocation_count, wins, losses, single_loss, gammon_loss, backgammon_loss, unresolved, single_win, gammon_win, backgammon_win, reward_sum, reward_sum_sq, reward_model, posterior_model, unresolved_value, posterior_prior, draws)
+}
+
+bg_cpp_posterior_summary <- function(allocation_count, wins, losses, single_loss, gammon_loss, backgammon_loss, unresolved, single_win, gammon_win, backgammon_win, reward_sum, reward_sum_sq, reward_model, posterior_model, unresolved_value, posterior_prior, draws) {
+    .Call(`_backgammonr_bg_cpp_posterior_summary`, allocation_count, wins, losses, single_loss, gammon_loss, backgammon_loss, unresolved, single_win, gammon_win, backgammon_win, reward_sum, reward_sum_sq, reward_model, posterior_model, unresolved_value, posterior_prior, draws)
+}
+
+bg_cpp_reference_summary <- function(allocation_count, unresolved, reward_sum, reward_sum_sq, prior_alpha, prior_beta) {
+    .Call(`_backgammonr_bg_cpp_reference_summary`, allocation_count, unresolved, reward_sum, reward_sum_sq, prior_alpha, prior_beta)
+}
+
+bg_cpp_eval_path_metrics <- function(checkpoint, runtime_seconds, top1_match, epsilon_optimal, simple_regret, recommended_prob_best) {
+    .Call(`_backgammonr_bg_cpp_eval_path_metrics`, checkpoint, runtime_seconds, top1_match, epsilon_optimal, simple_regret, recommended_prob_best)
+}
+
+bg_cpp_calibration_summary <- function(predicted_prob, observed_top1, bins) {
+    .Call(`_backgammonr_bg_cpp_calibration_summary`, predicted_prob, observed_top1, bins)
 }
 
 bg_cpp_random_move_choice <- function(legal_moves, seed, use_seed) {

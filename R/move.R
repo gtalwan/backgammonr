@@ -1,3 +1,4 @@
+# Move-step and move-sequence constructors plus helpers.
 bg_new_move_step <- function(x) {
   structure(x, class = "bg_move_step")
 }

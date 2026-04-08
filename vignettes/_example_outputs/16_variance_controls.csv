@@ -1,7 +1,0 @@
-"dice_mode","crn","chosen_move_label","correct_selection","simple_regret","mse","runtime_seconds"
-"iid",FALSE,"8->7, 8->2",FALSE,0.0396039603960396,0.0127885438267604,0.194
-"iid",TRUE,"6->5, 24->18",FALSE,0.0321782178217822,0.0151405388720172,0.199
-"stratified_first_roll",FALSE,"13->7, 7->6",FALSE,0.0371287128712872,0.00811372349814198,0.212000000000001
-"stratified_first_roll",TRUE,"24->23, 8->2",TRUE,0,0.0066831466565544,0.201
-"stratified_first_two_rolls",FALSE,"24->23, 8->2",TRUE,0,0.0102619508292984,0.196
-"stratified_first_two_rolls",TRUE,"24->23, 13->7",FALSE,0.0717821782178218,0.0359480012347807,0.216

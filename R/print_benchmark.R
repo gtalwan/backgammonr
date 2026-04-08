@@ -4,7 +4,6 @@
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_matchup_benchmark <- function(x, ...) {
   if (!is_bg_matchup_benchmark(x)) {
     stop("`x` must inherit from class 'bg_matchup_benchmark'.", call. = FALSE)
@@ -29,7 +28,6 @@ print.bg_matchup_benchmark <- function(x, ...) {
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_move_evaluation_benchmark <- function(x, ...) {
   if (!is_bg_move_evaluation_benchmark(x)) {
     stop("`x` must inherit from class 'bg_move_evaluation_benchmark'.", call. = FALSE)

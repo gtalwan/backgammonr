@@ -4,61 +4,79 @@
 \name{backgammonr-package}
 \alias{backgammonr}
 \alias{backgammonr-package}
-\title{backgammonr: Finite-budget rollout allocation for backgammon}
+\title{backgammonr: Thompson sampling for finite-budget backgammon decisions}
 \description{
-\code{backgammonr} is a research-oriented statistical computing package for
-finite-budget rollout allocation under simulation noise, using backgammon as
-a stochastic testbed.
+\code{backgammonr} is a Thompson-sampling research toolkit for fixed-budget
+best-action identification under Monte Carlo noise, with backgammon as the
+stochastic laboratory rather than the primary product identity.
 }
 \details{
-The package centers on this decision problem:
+The canonical package object is one local decision problem:
 \itemize{
-\item for one decision instance \verb{(state, realized_roll)}, legal actions
-\verb{A_d = \{1, ..., K\}}, and rollout rewards in \verb{[0, 1]}, can Thompson
-sampling allocate a fixed simulation budget \code{N} efficiently enough to
-identify the rollout-model best action?
+\item one board state;
+\item one realized dice roll;
+\item \code{K} legal root actions;
+\item rollout-model values \code{mu_i = E[Y_i | simulation_policy, truncation_rule, payoff_mapping]};
+\item a fixed simulation budget \code{N};
+\item an allocation policy that decides how to spend that budget.
 }
 
-In package terms, a \emph{rollout} is one Monte Carlo continuation from a chosen
-action. Repeated rollouts estimate action values under a specified rollout
-policy and turn the move-choice problem into a ranking-and-selection task.
+In package terms, a \emph{rollout} is one simulated continuation after committing
+to a root action. Sequential Thompson sampling is the canonical allocation
+policy for this budgeted ranking-and-selection problem. Comparator methods
+remain available, but primarily to help interpret Thompson behavior.
+}
+\section{Scientific distinctions}{
 
-The package combines:
+The package explicitly distinguishes:
 \itemize{
-\item a C++ backgammon engine for legal move generation and state transitions;
-\item Thompson-family allocation (\code{thompson}, \code{ttts}) as the conceptual center;
-\item baseline allocation methods (\code{equal}, \code{greedy}, \code{ucb}, \code{ocba}) for
-controlled comparison;
-\item reference-estimation, study, benchmark, and reporting tools for proxy PCS,
-simple regret, value-estimation error, and runtime tradeoffs.
+\item rollout-model value: the estimand defined by the rollout continuation
+policy, truncation rule, and payoff mapping;
+\item proxy reference: a high-budget Monte Carlo estimate used as a practical
+reference for regret and ranking diagnostics;
+\item true backgammon strength / game-theoretic truth: not available and never
+implied by the package outputs.
 }
-}
-\section{Main workflow}{
 
-A typical user workflow is:
+Posterior quantities are therefore approximate and model-relative, not claims
+of exact truth.
+
+The package now exposes an explicit reward/posterior model layer. The
+default front door is the scalar-payoff baseline
+\code{reward_model = "scalar_payoff"} with \code{posterior_model = "beta_pseudo"},
+while coherent alternatives such as \code{win_loss + beta_bernoulli} and
+\code{categorical_outcome + dirichlet_multinomial} are available for direct
+comparison.
+}
+
+\section{TS-first workflow}{
+
+Recommended entry points for the public interface are:
 \itemize{
-\item construct a board and realized roll;
-\item enumerate legal actions;
-\item evaluate the action set under a finite budget;
-\item build a higher-budget reference estimate;
-\item compare the finite-budget recommendation to the reference;
-\item summarize stability across budgets or benchmark cases.
-}
-}
-
-\section{Central exported functions}{
-
-Important user-facing entry points include:
-\itemize{
-\item \code{evaluate_actions_thompson()} and \code{evaluate_actions_ttts()};
-\item \code{approximate_action_reference()} and \code{certify_reference_truth()};
-\item \code{compare_thompson_to_reference()};
-\item \code{study_budget_tradeoff()} and \code{study_variance_controls()};
-\item \code{benchmark_thompson()} and \code{summarize_thompson_benchmark()}.
+\item \code{bg_problem()} to define one state-plus-roll decision problem;
+\item \code{bg_reference()}, \code{bg_truth_state()}, and \code{bg_truth_opening()} to build
+or reuse proxy references;
+\item \code{bg_study_save()} / \code{bg_study_load()} to keep expensive study objects
+reusable;
+\item \code{bg_ts_run()} and \code{bg_ttts_run()} for the main TS analysis loop;
+\item \code{bg_reference()} to construct or extend a high-budget proxy reference;
+\item \code{bg_ucb_run()} to expose an optimism-based scalar-engine comparator;
+\item \code{bg_compare_algorithms()} to compare Thompson to TTTS, UCB, and baseline
+allocation rules, with scalar-engine comparators restricted to
+\code{scalar_payoff + beta_pseudo} problems in the current rescue pass;
+\item \code{bg_eval_reference_aware()} and \code{plot_bg_budget_curve()} to summarize
+finite-budget performance;
+\item \code{bg_compare_posteriors()} and \code{bg_compare_reward_models()} for the
+compact model-comparison workflows.
 }
 
-Core loops use \code{Rcpp}/\code{RcppArmadillo} with batched C++ simulation calls for
-high-throughput research workflows.
+Legacy helpers remain in the source tree for compatibility and internal
+reuse, but they are no longer part of the package narrative. The intended
+workflow runs through the curated \verb{bg_*} interface.
+
+Core loops use \code{Rcpp}, \code{RcppArmadillo}, and \code{RcppParallel} to keep canonical
+sequential Thompson semantics intact while accelerating proxy-reference
+generation and repeated-study workflows.
 }
 
 \seealso{

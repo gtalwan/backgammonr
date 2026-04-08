@@ -1,3 +1,4 @@
+# Legal-move generation wrappers around the C++ move generator.
 bg_wrap_move_sequence_output <- function(x) {
   if (is.null(x)) {
     return(NULL)

@@ -1,3 +1,4 @@
+// Legal-move generation kernels.
 #include "bg_movegen.h"
 
 #include <algorithm>

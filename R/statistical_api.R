@@ -5,7 +5,6 @@
 #' @inheritParams bg_position
 #'
 #' @return A validated `bg_board` object.
-#' @export
 initialize_board <- function(...) {
   bg_position(...)
 }
@@ -17,7 +16,6 @@ initialize_board <- function(...) {
 #' @inheritParams bg_validate_board
 #'
 #' @return See [bg_validate_board()].
-#' @export
 validate_board <- function(state, error = TRUE) {
   bg_validate_board(state, error = error)
 }
@@ -29,7 +27,6 @@ validate_board <- function(state, error = TRUE) {
 #' @inheritParams bg_print_board
 #'
 #' @return The input board, invisibly.
-#' @export
 print_board <- function(board, show_indices = TRUE) {
   bg_print_board(board, show_indices = show_indices)
 }
@@ -41,7 +38,6 @@ print_board <- function(board, show_indices = TRUE) {
 #' @inheritParams bg_plot_board
 #'
 #' @return The input board, invisibly.
-#' @export
 plot_board <- function(board, ...) {
   bg_plot_board(board, ...)
 }
@@ -53,7 +49,6 @@ plot_board <- function(board, ...) {
 #' @inheritParams bg_roll_dice
 #'
 #' @return See [bg_roll_dice()].
-#' @export
 roll_dice <- function(n = 1L, seed = NULL) {
   bg_roll_dice(n = n, seed = seed)
 }
@@ -65,7 +60,6 @@ roll_dice <- function(n = 1L, seed = NULL) {
 #' @inheritParams bg_legal_moves
 #'
 #' @return A list of legal `bg_move_sequence` objects.
-#' @export
 generate_legal_moves <- function(state, dice, player = NULL) {
   bg_legal_moves(state, dice, player = player)
 }
@@ -85,7 +79,6 @@ generate_legal_moves <- function(state, dice, player = NULL) {
 #' @return A data frame with columns `candidate_index`, `move_label`,
 #'   `n_steps`, and `dice_used`. The full number of legal candidates is stored
 #'   as attribute `n_total_candidates`.
-#' @export
 #'
 #' @examples
 #' board <- bg_initial_board()
@@ -165,7 +158,6 @@ summarize_legal_moves <- function(
 #' @param move A legal `bg_move_sequence` object.
 #'
 #' @return A `bg_board` object after applying the move.
-#' @export
 apply_move <- function(state, move) {
   bg_apply_move_sequence(state, move)
 }
@@ -192,7 +184,6 @@ bg_match_policy_name <- function(policy, arg_name = "policy") {
 #' @param max_rollout_turns Integer-like scalar maximum rollout horizon.
 #'
 #' @return A `bg_game_result` object.
-#' @export
 simulate_game <- function(
     state = bg_initial_board(),
     policy_white = c(
@@ -233,7 +224,6 @@ simulate_game <- function(
 #' @param dice A `bg_roll` object.
 #'
 #' @return A list of candidate moves (`bg_move_sequence`).
-#' @export
 enumerate_candidate_moves <- function(state, dice) {
   bg_legal_moves(state, dice)
 }
@@ -254,7 +244,6 @@ enumerate_candidate_moves <- function(state, dice) {
 #' @param seed Optional integer seed.
 #'
 #' @return A one-row data frame with posterior estimate and uncertainty.
-#' @export
 estimate_action_value <- function(
     state,
     action,
@@ -287,7 +276,6 @@ estimate_action_value <- function(
 #' @inheritParams estimate_action_value
 #'
 #' @return A one-row data frame.
-#' @export
 rollout_move_value <- function(
     state,
     move,
@@ -321,7 +309,6 @@ rollout_move_value <- function(
 #' @inheritParams evaluate_actions_equal
 #'
 #' @return A `bg_action_evaluation` object.
-#' @export
 evaluate_moves_equal_allocation <- function(state, dice, budget = 32L, ...) {
   evaluate_actions_equal(board = state, roll = dice, total_budget = budget, ...)
 }
@@ -336,7 +323,6 @@ evaluate_moves_equal_allocation <- function(state, dice, budget = 32L, ...) {
 #' @inheritParams evaluate_actions_ucb
 #'
 #' @return A `bg_action_evaluation` object.
-#' @export
 evaluate_moves_ucb <- function(state, dice, budget = 32L, ...) {
   evaluate_actions_ucb(board = state, roll = dice, total_budget = budget, ...)
 }
@@ -351,7 +337,6 @@ evaluate_moves_ucb <- function(state, dice, budget = 32L, ...) {
 #' @inheritParams evaluate_actions_thompson
 #'
 #' @return A `bg_action_evaluation` object.
-#' @export
 evaluate_moves_thompson <- function(state, dice, budget = 32L, ...) {
   evaluate_actions_thompson(board = state, roll = dice, total_budget = budget, ...)
 }
@@ -366,7 +351,6 @@ evaluate_moves_thompson <- function(state, dice, budget = 32L, ...) {
 #' @inheritParams evaluate_actions_ttts
 #'
 #' @return A `bg_action_evaluation` object.
-#' @export
 evaluate_moves_ttts <- function(state, dice, budget = 32L, ...) {
   evaluate_actions_ttts(board = state, roll = dice, total_budget = budget, ...)
 }
@@ -383,7 +367,6 @@ evaluate_moves_ttts <- function(state, dice, budget = 32L, ...) {
 #' @inheritParams evaluate_actions_ocba
 #'
 #' @return A `bg_action_evaluation` object.
-#' @export
 evaluate_moves_successive_elimination <- function(state, dice, budget = 32L, ...) {
   evaluate_actions_ocba(board = state, roll = dice, total_budget = budget, ...)
 }
@@ -396,7 +379,6 @@ evaluate_moves_successive_elimination <- function(state, dice, budget = 32L, ...
 #' @inheritParams approximate_action_truth
 #'
 #' @return A list with `reference_index`, `reference_move`, and `truth`.
-#' @export
 identify_reference_best_move <- function(
     state,
     dice,
@@ -439,7 +421,6 @@ identify_reference_best_move <- function(
 #' @inheritParams benchmark_allocation_methods
 #'
 #' @return A `bg_allocation_benchmark` object.
-#' @export
 benchmark_evaluators <- function(
     test_positions,
     budgets = c(16L, 32L, 64L),
@@ -482,7 +463,6 @@ benchmark_evaluators <- function(
 #' @param x A `bg_allocation_benchmark` object.
 #'
 #' @return A summary data frame.
-#' @export
 summarize_benchmark_results <- function(x) {
   if (!inherits(x, "bg_allocation_benchmark")) {
     stop("`x` must inherit from class 'bg_allocation_benchmark'.", call. = FALSE)
@@ -497,7 +477,6 @@ summarize_benchmark_results <- function(x) {
 #' @param ... Passed to [bg_plot_benchmark_summary()].
 #'
 #' @return The plotting data frame, invisibly.
-#' @export
 plot_benchmark_results <- function(
     x,
     metric = c(
@@ -516,7 +495,6 @@ plot_benchmark_results <- function(
 #' @param ... Unused.
 #'
 #' @return The plotting data frame, invisibly.
-#' @export
 plot_budget_accuracy_curve <- function(x, ...) {
   bg_plot_benchmark_summary(x, metric = "probability_correct_selection")
 }
@@ -527,7 +505,6 @@ plot_budget_accuracy_curve <- function(x, ...) {
 #' @param ... Unused.
 #'
 #' @return The plotting data frame, invisibly.
-#' @export
 plot_runtime_curve <- function(x, ...) {
   bg_plot_benchmark_summary(x, metric = "mean_runtime_seconds")
 }
@@ -538,7 +515,6 @@ plot_runtime_curve <- function(x, ...) {
 #' @param dice Optional `bg_roll` object.
 #'
 #' @return A character scalar.
-#' @export
 explain_position <- function(state, dice = NULL) {
   info <- bg_inspect_board(state)
   if (is.null(dice)) {
@@ -562,7 +538,6 @@ explain_position <- function(state, dice = NULL) {
 #' @param x A `bg_action_evaluation` or `bg_move_recommendation` object.
 #'
 #' @return A character scalar.
-#' @export
 explain_move_evaluation <- function(x) {
   if (inherits(x, "bg_move_recommendation")) {
     return(x$explanation)
@@ -591,7 +566,6 @@ explain_move_evaluation <- function(x) {
 #'   interpretation columns.
 #'
 #' @return A data frame of posterior summaries.
-#' @export
 compare_action_posteriors <- function(x, top_n = 10L, diagnostics = FALSE) {
   top_n <- bg_coerce_integerish(top_n, "top_n", 1L)
   if (top_n < 1L) {
@@ -647,7 +621,6 @@ compare_action_posteriors <- function(x, top_n = 10L, diagnostics = FALSE) {
 #'   `bg_analysis_report` object.
 #'
 #' @return A trace data frame, or `NULL` if unavailable.
-#' @export
 trace_allocation_history <- function(x) {
   if (inherits(x, "bg_analysis_report")) {
     return(x$trace)

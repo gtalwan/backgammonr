@@ -1,3 +1,4 @@
+# Board constructors, validators, and board-level utilities.
 bg_known_board_fields <- function() {
   c("points", "bar", "off", "turn")
 }

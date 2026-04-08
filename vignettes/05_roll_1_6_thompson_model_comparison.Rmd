@@ -1,0 +1,230 @@
+---
+title: "Roll 1-6: Thompson Model Comparison"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Roll 1-6: Thompson Model Comparison}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+library(backgammonr)
+library(ggplot2)
+library(knitr)
+```
+
+This notebook keeps the allocation rule fixed at canonical Thompson sampling and changes the statistical model stack.
+
+The two comparison functions are:
+
+- `bg_compare_posteriors()` for one reward model with different posterior families.
+- `bg_compare_reward_models()` for different coherent reward-model/posterior-model stacks.
+
+```{r settings}
+truth_budget <- 100000L
+roll_1_6_truth_path <- file.path(
+  "artifacts",
+  "opening_truths",
+  paste0("opening_1-6_truth_budget_", truth_budget, ".rds")
+)
+
+if (!file.exists(roll_1_6_truth_path)) {
+  stop("Run 01_save_all_21_opening_truths.Rmd first so the 1-6 truth file exists.")
+}
+
+model_budgets <- c(16L, 32L, 64L, 128L, 256L, 512L)
+model_seeds <- 1:25
+model_overwrite <- FALSE
+
+study_dir <- file.path("artifacts", "studies")
+dir.create(study_dir, recursive = TRUE, showWarnings = FALSE)
+
+posterior_compare_path <- file.path(
+  study_dir,
+  "opening_1-6_scalar_posterior_compare.rds"
+)
+
+reward_compare_path <- file.path(
+  study_dir,
+  "opening_1-6_reward_stack_compare.rds"
+)
+
+truth_1_6 <- bg_truth_load(roll_1_6_truth_path)
+
+problem_1_6 <- bg_problem(
+  state = bg_initial_board(),
+  roll = bg_roll(1L, 6L),
+  simulation_policy = "random",
+  reward_model = "scalar_payoff",
+  posterior_model = "beta_pseudo",
+  problem_id = "opening_1-6"
+)
+```
+
+```{r posterior-compare}
+posterior_compare_1_6 <- bg_compare_posteriors(
+  problems = problem_1_6,
+  reward_model = "scalar_payoff",
+  posterior_models = c("beta_pseudo", "student_t_marginal", "bootstrap"),
+  budgets = model_budgets,
+  seeds = model_seeds,
+  allocation_policy = "thompson",
+  proxy_references = truth_1_6$reference,
+  save_path = posterior_compare_path,
+  overwrite = model_overwrite
+)
+```
+
+```{r posterior-summary}
+knitr::kable(
+  posterior_compare_1_6$summary,
+  digits = 4,
+  caption = "Posterior-family comparison for scalar-payoff Thompson sampling."
+)
+```
+
+```{r posterior-eval}
+posterior_eval <- bg_eval_reference_aware(
+  posterior_compare_1_6,
+  truth = truth_1_6$reference,
+  top_k = 3L
+)
+
+posterior_final <- posterior_eval[posterior_eval$checkpoint == max(model_budgets), ]
+posterior_final <- aggregate(
+  posterior_final[, c(
+    "top1_match",
+    "simple_regret",
+    "selected_reference_rank",
+    "recommended_prob_best",
+    "spearman",
+    "share_best_truth",
+    "allocation_entropy"
+  )],
+  by = list(allocation_policy = posterior_final$allocation_policy),
+  FUN = mean,
+  na.rm = TRUE
+)
+
+knitr::kable(
+  posterior_final,
+  digits = 4,
+  caption = "Posterior-family comparison at the largest budget."
+)
+```
+
+```{r reward-compare}
+reward_compare_1_6 <- bg_compare_reward_models(
+  problems = problem_1_6,
+  reward_model_map = c(
+    scalar_payoff = "beta_pseudo",
+    categorical_outcome = "dirichlet_multinomial",
+    win_loss = "beta_bernoulli"
+  ),
+  budgets = model_budgets,
+  seeds = model_seeds,
+  allocation_policy = "thompson",
+  reference_budget = truth_budget,
+  save_path = reward_compare_path,
+  overwrite = model_overwrite
+)
+```
+
+```{r reward-summary}
+knitr::kable(
+  reward_compare_1_6$summary,
+  digits = 4,
+  caption = "Reward-model stack comparison for canonical Thompson sampling."
+)
+```
+
+```{r reward-eval}
+reward_eval <- bg_eval_reference_aware(
+  reward_compare_1_6,
+  top_k = 3L
+)
+
+reward_final <- reward_eval[reward_eval$checkpoint == max(model_budgets), ]
+reward_final <- aggregate(
+  reward_final[, c(
+    "top1_match",
+    "simple_regret",
+    "selected_reference_rank",
+    "recommended_prob_best",
+    "spearman",
+    "share_best_truth",
+    "allocation_entropy"
+  )],
+  by = list(allocation_policy = reward_final$allocation_policy),
+  FUN = mean,
+  na.rm = TRUE
+)
+
+knitr::kable(
+  reward_final,
+  digits = 4,
+  caption = "Reward-model stack comparison at the largest budget."
+)
+```
+
+```{r posterior-regret-plot, fig.width=9, fig.height=5}
+plot_bg_posterior_compare(
+  posterior_compare_1_6,
+  metric = "simple_regret"
+)
+```
+
+```{r posterior-match-plot, fig.width=9, fig.height=5}
+plot_bg_posterior_compare(
+  posterior_compare_1_6,
+  metric = "top1_match"
+)
+```
+
+```{r reward-regret-plot, fig.width=9, fig.height=5}
+plot_bg_posterior_compare(
+  reward_compare_1_6,
+  metric = "simple_regret"
+)
+```
+
+```{r reward-rank-plot, fig.width=9, fig.height=5}
+plot_bg_posterior_compare(
+  reward_compare_1_6,
+  metric = "spearman"
+)
+```
+
+```{r model-runtime-table}
+posterior_runtime <- aggregate(
+  posterior_compare_1_6$results[, c("runtime_seconds", "rollout_throughput")],
+  by = list(
+    allocation_policy = posterior_compare_1_6$results$allocation_policy,
+    checkpoint = posterior_compare_1_6$results$checkpoint
+  ),
+  FUN = mean,
+  na.rm = TRUE
+)
+
+reward_runtime <- aggregate(
+  reward_compare_1_6$results[, c("runtime_seconds", "rollout_throughput")],
+  by = list(
+    allocation_policy = reward_compare_1_6$results$allocation_policy,
+    checkpoint = reward_compare_1_6$results$checkpoint
+  ),
+  FUN = mean,
+  na.rm = TRUE
+)
+
+knitr::kable(
+  posterior_runtime,
+  digits = 4,
+  caption = "Runtime and throughput for the scalar posterior-family comparison."
+)
+
+knitr::kable(
+  reward_runtime,
+  digits = 4,
+  caption = "Runtime and throughput for the reward-model stack comparison."
+)
+```

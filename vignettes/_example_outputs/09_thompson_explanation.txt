@@ -1,1 +1,0 @@
-Method thompson selected candidate 2 (`24->23, 13->7`) with posterior mean 0.618 after 49 rollouts. 

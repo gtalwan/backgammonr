@@ -1,0 +1,39 @@
+% Manual page for curated front-door API
+\name{bg_ucb_run}
+\alias{bg_ucb_run}
+\title{Run a UCB baseline on one problem}
+\usage{
+bg_ucb_run(
+  problem,
+  budget = 256L,
+  checkpoints = NULL,
+  proxy_reference = NULL,
+  ucb_variant = c("ucb1"),
+  ucb_exploration = 1,
+  ...
+)
+}
+\arguments{
+\item{problem}{A \code{bg_problem} object.}
+
+\item{budget}{Integer-like simulation budget.}
+
+\item{checkpoints}{Optional checkpoint vector.}
+
+\item{proxy_reference}{Optional \code{bg_reference} object.}
+
+\item{ucb_variant}{UCB variant. The current front door supports only
+\code{"ucb1"}.}
+
+\item{ucb_exploration}{Exploration multiplier used in the bonus term.}
+
+\item{...}{Passed to the internal rollout runner.}
+}
+\value{
+A \code{bg_ts_run} object with \code{allocation_policy = "ucb"}.
+}
+\description{
+This is the public front door for the optimism-under-uncertainty comparator
+family. The current implementation corresponds to a UCB1-style rule on the
+rollout reward scale declared by the \code{bg_problem}.
+}

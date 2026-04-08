@@ -1,3 +1,4 @@
+// Legacy benchmark kernels for matchups and evaluator studies.
 #include "bg_benchmark.h"
 // This translation unit contains benchmark-oriented orchestration for the
 // rollout/statistical APIs. The game engine produces stochastic outcomes;

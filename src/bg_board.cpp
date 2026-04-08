@@ -1,3 +1,4 @@
+// Board construction, cloning, and validation kernels.
 #include "bg_board.h"
 
 #include <cmath>

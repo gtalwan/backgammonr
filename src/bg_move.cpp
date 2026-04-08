@@ -1,3 +1,4 @@
+// Move-step and move-sequence construction kernels.
 #include "bg_move.h"
 
 #include <array>

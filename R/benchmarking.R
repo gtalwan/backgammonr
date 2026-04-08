@@ -1,3 +1,4 @@
+# Legacy benchmarking workflows built around the scalar rollout engine.
 bg_normalize_benchmark_methods <- function(methods, arg_name = "methods") {
   if (!is.character(methods) || length(methods) < 1L || anyNA(methods)) {
     stop(sprintf("`%s` must be a non-missing character vector.", arg_name), call. = FALSE)
@@ -35,7 +36,6 @@ bg_new_matchup_benchmark <- function(x) {
 #' @param x An object.
 #'
 #' @return `TRUE` if `x` inherits from class `"bg_matchup_benchmark"`.
-#' @export
 is_bg_matchup_benchmark <- function(x) {
   inherits(x, "bg_matchup_benchmark")
 }
@@ -82,7 +82,6 @@ is_bg_matchup_benchmark <- function(x) {
 #'   - `settings`: benchmark settings;
 #'   - `initial_board`: the starting board.
 #'
-#' @export
 #'
 #' @examples
 #' board <- bg_initial_board()
@@ -184,7 +183,6 @@ benchmark_matchup <- function(
 #' @param ... Unused.
 #'
 #' @return A one-row summary data frame.
-#' @export
 summary.bg_matchup_benchmark <- function(object, ...) {
   object$summary
 }
@@ -262,7 +260,6 @@ bg_normalize_benchmark_cases <- function(cases) {
 #' @param x An object.
 #'
 #' @return `TRUE` if `x` inherits from class `"bg_benchmark_case"`.
-#' @export
 is_bg_benchmark_case <- function(x) {
   inherits(x, "bg_benchmark_case")
 }
@@ -278,7 +275,6 @@ is_bg_benchmark_case <- function(x) {
 #' @param case_id Optional character scalar identifying the case.
 #'
 #' @return An object of class `bg_benchmark_case`.
-#' @export
 #'
 #' @examples
 #' points <- integer(24)
@@ -334,7 +330,6 @@ bg_new_move_evaluation_benchmark <- function(x) {
 #' @param x An object.
 #'
 #' @return `TRUE` if `x` inherits from class `"bg_move_evaluation_benchmark"`.
-#' @export
 is_bg_move_evaluation_benchmark <- function(x) {
   inherits(x, "bg_move_evaluation_benchmark")
 }
@@ -381,7 +376,6 @@ is_bg_move_evaluation_benchmark <- function(x) {
 #'   - `summary`: one row per method;
 #'   - `settings`: benchmark settings.
 #'
-#' @export
 #'
 #' @examples
 #' case1 <- bg_benchmark_case(
@@ -477,7 +471,6 @@ benchmark_move_evaluators <- function(
 #' @param ... Unused.
 #'
 #' @return A summary data frame with one row per method.
-#' @export
 summary.bg_move_evaluation_benchmark <- function(object, ...) {
   object$summary
 }

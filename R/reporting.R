@@ -1,3 +1,4 @@
+# Legacy reporting helpers for benchmark and study objects.
 bg_new_analysis_report <- function(x) {
   x$board <- bg_new_board(x$board)
   x$roll <- bg_new_roll(x$roll)
@@ -26,7 +27,6 @@ bg_new_analysis_report <- function(x) {
 #' @inheritParams evaluate_actions_equal
 #'
 #' @return An object of class `bg_analysis_report`.
-#' @export
 bg_analysis_report <- function(
     board,
     roll,
@@ -91,7 +91,6 @@ bg_analysis_report <- function(
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_analysis_report <- function(x, n = 10L, ...) {
   cat("<bg_analysis_report>\n", sep = "")
   cat("method:       ", x$method, "\n", sep = "")
@@ -123,7 +122,6 @@ print.bg_analysis_report <- function(x, n = 10L, ...) {
 #' @param ... Unused.
 #'
 #' @return The input report, invisibly.
-#' @export
 plot.bg_analysis_report <- function(x, ...) {
   if (!inherits(x, "bg_analysis_report")) {
     stop("`x` must inherit from class 'bg_analysis_report'.", call. = FALSE)

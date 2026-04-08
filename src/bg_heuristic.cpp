@@ -1,3 +1,4 @@
+// Heuristic board scoring, feature extraction, and move-choice kernels.
 #include "bg_heuristic.h"
 
 #include <limits>

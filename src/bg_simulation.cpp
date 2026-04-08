@@ -1,3 +1,4 @@
+// Matchup and repeated-game simulation kernels.
 #include "bg_simulation.h"
 // This translation unit implements the multi-game simulation layer that
 // aggregates per-game stochastic outcomes into study-ready summary tables.

@@ -1,7 +1,7 @@
 Package: backgammonr
 Type: Package
-Title: Finite-Budget Rollout Allocation for Backgammon
-Version: 0.2.1
+Title: Thompson-Sampling Toolkit for Finite-Budget Backgammon Decisions
+Version: 0.3.0
 Authors@R:
     person(given = "Gabriel",
            family = "Alwan",
@@ -9,15 +9,15 @@ Authors@R:
            email = "gabriel.alwan@gmail.com")
 Author: Gabriel Alwan [aut, cre]
 Maintainer: Gabriel Alwan <gabriel.alwan@gmail.com>
-Description: Research-oriented statistical-computing tools for finite-budget
-    simulation allocation in backgammon. The package frames a board state plus
-    realized dice roll as a ranking-and-selection problem under Monte Carlo
-    noise and centers Thompson sampling and related allocation rules for
-    best-action identification. It combines a C++ backgammon engine, rollout
-    value estimation, high-budget reference approximation, baseline comparison
-    methods, benchmarking helpers, and reporting tools for probability of
-    correct selection, simple regret, value-estimation error, and runtime
-    tradeoffs.
+Description: Thompson-sampling research toolkit for fixed-budget best-action
+    identification under Monte Carlo noise, with backgammon as a realistic
+    stochastic laboratory. The package frames one board state plus one
+    realized dice roll as a finite-budget simulation-allocation problem over
+    legal root actions. It distinguishes rollout-model values, high-budget
+    proxy references, and unavailable game-theoretic truth; keeps sequential
+    Thompson sampling as the canonical allocation policy; and provides a
+    compact front door for proxy-reference estimation, method comparison,
+    evaluation, and visualization.
 License: MIT + file LICENSE
 URL: https://github.com/gtalwan/backgammonr
 BugReports: https://github.com/gtalwan/backgammonr/issues
@@ -26,12 +26,17 @@ LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Imports:
-    Rcpp
+    ggplot2,
+    Rcpp,
+    RcppParallel,
+    tibble
 LinkingTo:
     Rcpp,
-    RcppArmadillo
+    RcppArmadillo,
+    RcppParallel
 Suggests:
     knitr,
+    pkgdown,
     rmarkdown,
     testthat (>= 3.0.0)
 VignetteBuilder:

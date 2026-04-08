@@ -1,3 +1,4 @@
+// Random move-choice kernel used by the game engine.
 #include "bg_random_player.h"
 
 #include <cstdint>

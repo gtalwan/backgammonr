@@ -1,3 +1,4 @@
+# Rollout-based move-selection wrappers and convenience helpers.
 bg_match_rollout_policy <- function(policy) {
   match.arg(policy, choices = c("random", "aggressive", "defensive"))
 }
