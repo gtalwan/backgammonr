@@ -14,6 +14,16 @@
 
 namespace backgammonr {
 
+enum class TerminalScoreClass {
+  kSingleLoss = 0,
+  kGammonLoss = 1,
+  kBackgammonLoss = 2,
+  kUnresolved = 3,
+  kSingleWin = 4,
+  kGammonWin = 5,
+  kBackgammonWin = 6
+};
+
 struct TurnResult {
   BoardState board_before{};
   BoardState board_after{};
@@ -44,6 +54,8 @@ struct GameResult {
 
 bool board_is_terminal(const BoardState& board);
 int board_winner(const BoardState& board);
+TerminalScoreClass terminal_score_class(const BoardState& board, int perspective_player);
+std::string terminal_score_class_label(TerminalScoreClass score_class);
 BoardState apply_move_sequence_to_board(const BoardState& board, const MoveSequence& sequence);
 MoveSequence choose_move_sequence(
     const BoardState& board,

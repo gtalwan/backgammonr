@@ -1,3 +1,4 @@
+# Legacy statistical-study workflows retained for compatibility.
 bg_normalize_study_methods <- function(methods, arg_name = "methods") {
   if (!is.character(methods) || length(methods) < 1L || anyNA(methods)) {
     stop(sprintf("`%s` must be a non-empty character vector.", arg_name), call. = FALSE)
@@ -64,7 +65,6 @@ bg_recommended_row <- function(evaluation) {
 #' - Use `recommended_prob_best` / `recommended_expected_regret` when available
 #'   (`fast_diagnostics = FALSE`).
 #' - Runtime should be interpreted jointly with regret/PCS metrics.
-#' @export
 #'
 #' @examples
 #' board <- bg_initial_board()
@@ -240,7 +240,6 @@ compare_methods_on_position <- function(
 #' - `simple_regret` quantifies the value loss from the selected action.
 #' - `mse` measures whole-vector estimation quality, not only recommendation.
 #' - Improvements can be non-monotone at finite budgets due to simulation noise.
-#' @export
 #'
 #' @examples
 #' board <- bg_initial_board()
@@ -458,7 +457,6 @@ study_budget_tradeoff <- function(
 #'   estimation under the tested variance controls.
 #' - Effects can be state-dependent; repeat on multiple benchmark cases before
 #'   drawing broad conclusions.
-#' @export
 #'
 #' @examples
 #' board <- bg_initial_board()
@@ -673,7 +671,6 @@ study_variance_controls <- function(
 #' @param ... Unused.
 #'
 #' @return A method-level summary data frame.
-#' @export
 summary.bg_method_comparison <- function(object, ...) {
   if (!inherits(object, "bg_method_comparison")) {
     stop("`object` must inherit from class 'bg_method_comparison'.", call. = FALSE)
@@ -688,7 +685,6 @@ summary.bg_method_comparison <- function(object, ...) {
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_method_comparison <- function(x, n = 20L, ...) {
   if (!inherits(x, "bg_method_comparison")) {
     stop("`x` must inherit from class 'bg_method_comparison'.", call. = FALSE)
@@ -718,7 +714,6 @@ print.bg_method_comparison <- function(x, n = 20L, ...) {
 #' @param ... Unused.
 #'
 #' @return A budget-level results data frame.
-#' @export
 summary.bg_budget_tradeoff <- function(object, ...) {
   if (!inherits(object, "bg_budget_tradeoff")) {
     stop("`object` must inherit from class 'bg_budget_tradeoff'.", call. = FALSE)
@@ -733,7 +728,6 @@ summary.bg_budget_tradeoff <- function(object, ...) {
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_budget_tradeoff <- function(x, n = 20L, ...) {
   if (!inherits(x, "bg_budget_tradeoff")) {
     stop("`x` must inherit from class 'bg_budget_tradeoff'.", call. = FALSE)
@@ -757,7 +751,6 @@ print.bg_budget_tradeoff <- function(x, n = 20L, ...) {
 #' @param ... Unused.
 #'
 #' @return A configuration-level results data frame.
-#' @export
 summary.bg_variance_control_study <- function(object, ...) {
   if (!inherits(object, "bg_variance_control_study")) {
     stop("`object` must inherit from class 'bg_variance_control_study'.", call. = FALSE)
@@ -773,7 +766,6 @@ summary.bg_variance_control_study <- function(object, ...) {
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_variance_control_study <- function(x, n = 20L, ...) {
   if (!inherits(x, "bg_variance_control_study")) {
     stop("`x` must inherit from class 'bg_variance_control_study'.", call. = FALSE)

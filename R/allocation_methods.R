@@ -1,3 +1,4 @@
+# Legacy scalar-engine allocation wrappers and benchmark-facing method adapters.
 bg_match_allocation_method <- function(method) {
   match.arg(
     method,
@@ -741,7 +742,6 @@ bg_evaluate_actions_method <- function(
 #'     `trace = TRUE`;}
 #'     \item{`settings`}{evaluation settings used to construct the output.}
 #'   }
-#' @export
 #'
 #' @examples
 #' points <- integer(24)
@@ -799,7 +799,6 @@ evaluate_actions_equal <- function(
 #' @inheritParams evaluate_actions_equal
 #'
 #' @return A `bg_action_evaluation` object.
-#' @export
 evaluate_actions_greedy <- function(
     board,
     roll = NULL,
@@ -848,7 +847,6 @@ evaluate_actions_greedy <- function(
 #' @inheritParams evaluate_actions_equal
 #'
 #' @return A `bg_action_evaluation` object.
-#' @export
 evaluate_actions_ucb <- function(
     board,
     roll = NULL,
@@ -897,7 +895,6 @@ evaluate_actions_ucb <- function(
 #' @inheritParams evaluate_actions_equal
 #'
 #' @return A `bg_action_evaluation` object.
-#' @export
 evaluate_actions_ocba <- function(
     board,
     roll = NULL,
@@ -978,7 +975,6 @@ evaluate_actions_ocba <- function(
 #' @inheritParams evaluate_actions_equal
 #'
 #' @return A `bg_action_evaluation` object.
-#' @export
 evaluate_actions_thompson <- function(
     board,
     roll = NULL,
@@ -1041,7 +1037,6 @@ evaluate_actions_thompson <- function(
 #'   common default in best-arm identification studies.
 #'
 #' @return A `bg_action_evaluation` object.
-#' @export
 evaluate_actions_ttts <- function(
     board,
     roll = NULL,
@@ -1105,7 +1100,6 @@ evaluate_actions_ttts <- function(
 #'
 #' @return A `bg_action_evaluation` object tagged with classes
 #'   `"bg_action_reference"` and `"bg_action_truth"`.
-#' @export
 approximate_action_truth <- function(
     board,
     roll = NULL,
@@ -1148,7 +1142,6 @@ approximate_action_truth <- function(
 #' @inheritParams approximate_action_truth
 #'
 #' @return A `bg_action_evaluation` object tagged as reference output.
-#' @export
 approximate_action_reference <- function(...) {
   approximate_action_truth(...)
 }
@@ -1176,7 +1169,6 @@ bg_extract_truth_values <- function(truth) {
 #' @param best_value Numeric vector of best-action values.
 #'
 #' @return Numeric vector of regrets.
-#' @export
 compute_regret <- function(selected_value, best_value) {
   if (!is.numeric(selected_value) || !is.numeric(best_value)) {
     stop("`selected_value` and `best_value` must be numeric.", call. = FALSE)
@@ -1195,7 +1187,6 @@ compute_regret <- function(selected_value, best_value) {
 #'   benchmark truth.
 #'
 #' @return Numeric scalar in `[0, 1]`.
-#' @export
 compute_best_action_accuracy <- function(chosen_index, truth_best_index) {
   chosen_index <- as.integer(chosen_index)
   truth_best_index <- as.integer(truth_best_index)
@@ -1216,7 +1207,6 @@ compute_best_action_accuracy <- function(chosen_index, truth_best_index) {
 #' @param truth Numeric vector of benchmark truth values.
 #'
 #' @return Numeric scalar.
-#' @export
 compute_mse <- function(estimate, truth) {
   if (!is.numeric(estimate) || !is.numeric(truth)) {
     stop("`estimate` and `truth` must be numeric.", call. = FALSE)
@@ -1237,7 +1227,6 @@ compute_mse <- function(estimate, truth) {
 #' @inheritParams compute_best_action_accuracy
 #'
 #' @return Numeric scalar in `[0, 1]`.
-#' @export
 compute_probability_of_correct_selection <- function(chosen_index, truth_best_index) {
   compute_best_action_accuracy(chosen_index, truth_best_index)
 }
@@ -1249,7 +1238,6 @@ compute_probability_of_correct_selection <- function(chosen_index, truth_best_in
 #' @inheritParams compute_regret
 #'
 #' @return Numeric vector of regrets.
-#' @export
 compute_simple_regret <- function(selected_value, best_value) {
   compute_regret(selected_value, best_value)
 }
@@ -1261,7 +1249,6 @@ compute_simple_regret <- function(selected_value, best_value) {
 #' @inheritParams compute_mse
 #'
 #' @return Numeric scalar.
-#' @export
 compute_value_mse <- function(estimate, truth) {
   compute_mse(estimate, truth)
 }
@@ -1280,7 +1267,6 @@ compute_value_mse <- function(estimate, truth) {
 #'
 #' @return An ordered factor if `x` is numeric. If `x` is a data frame, returns
 #'   the data frame with an added `difficulty_label` column.
-#' @export
 stratify_positions_by_difficulty <- function(
     x,
     breaks = c(-Inf, 0.02, 0.05, Inf),
@@ -1424,7 +1410,6 @@ bg_new_allocation_benchmark <- function(x) {
 #'
 #' @return A `bg_allocation_benchmark` object with rectangular `results`,
 #'   grouped `summary`, case-level `truth`, and `settings`.
-#' @export
 #'
 #' @examples
 #' points <- integer(24)
@@ -1792,7 +1777,6 @@ benchmark_allocation_methods <- function(
 #' @param ... Unused.
 #'
 #' @return A one-row data frame.
-#' @export
 summary.bg_action_evaluation <- function(object, ...) {
   if (!inherits(object, "bg_action_evaluation")) {
     stop("`object` must inherit from class 'bg_action_evaluation'.", call. = FALSE)
@@ -1850,7 +1834,6 @@ summary.bg_action_evaluation <- function(object, ...) {
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_action_evaluation <- function(x, n = 10L, ...) {
   if (!inherits(x, "bg_action_evaluation")) {
     stop("`x` must inherit from class 'bg_action_evaluation'.", call. = FALSE)
@@ -1893,7 +1876,6 @@ print.bg_action_evaluation <- function(x, n = 10L, ...) {
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_allocation_benchmark <- function(x, n = 20L, ...) {
   if (!inherits(x, "bg_allocation_benchmark")) {
     stop("`x` must inherit from class 'bg_allocation_benchmark'.", call. = FALSE)

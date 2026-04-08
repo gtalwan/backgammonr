@@ -1,3 +1,4 @@
+// Turn- and game-level simulation kernels.
 #include "bg_game.h"
 
 #include <cstdint>
@@ -23,6 +24,21 @@ void validate_player(const int player) {
 
 bool selection_uses_randomness(const std::string& selection) {
   return backgammonr::selection_uses_randomness(selection);
+}
+
+bool player_has_checker_in_home_board(
+    const backgammonr::BoardState& board,
+    const int player,
+    const int home_owner) {
+  for (int point = 1; point <= backgammonr::kNumPoints; ++point) {
+    if (!backgammonr::is_home_point(home_owner, point)) {
+      continue;
+    }
+    if (backgammonr::player_checker_count_on_point(board, player, point) > 0) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void validate_max_turns(const int max_turns) {
@@ -116,6 +132,55 @@ int board_winner(const BoardState& board) {
   }
 
   return 0;
+}
+
+TerminalScoreClass terminal_score_class(const BoardState& board, const int perspective_player) {
+  validate_player(perspective_player);
+
+  if (!board_is_terminal(board)) {
+    return TerminalScoreClass::kUnresolved;
+  }
+
+  const int winner = board_winner(board);
+  const int loser = -winner;
+  const bool perspective_wins = winner == perspective_player;
+  const int loser_index = player_index(loser);
+  const bool loser_bore_off_any = board.off[loser_index] > 0;
+
+  if (loser_bore_off_any) {
+    return perspective_wins ? TerminalScoreClass::kSingleWin : TerminalScoreClass::kSingleLoss;
+  }
+
+  const bool loser_on_bar = board.bar[loser_index] > 0;
+  const bool loser_in_winner_home = player_has_checker_in_home_board(board, loser, winner);
+  const bool backgammon = loser_on_bar || loser_in_winner_home;
+
+  if (perspective_wins) {
+    return backgammon ? TerminalScoreClass::kBackgammonWin : TerminalScoreClass::kGammonWin;
+  }
+
+  return backgammon ? TerminalScoreClass::kBackgammonLoss : TerminalScoreClass::kGammonLoss;
+}
+
+std::string terminal_score_class_label(const TerminalScoreClass score_class) {
+  switch (score_class) {
+    case TerminalScoreClass::kSingleLoss:
+      return "single_loss";
+    case TerminalScoreClass::kGammonLoss:
+      return "gammon_loss";
+    case TerminalScoreClass::kBackgammonLoss:
+      return "backgammon_loss";
+    case TerminalScoreClass::kUnresolved:
+      return "unresolved";
+    case TerminalScoreClass::kSingleWin:
+      return "single_win";
+    case TerminalScoreClass::kGammonWin:
+      return "gammon_win";
+    case TerminalScoreClass::kBackgammonWin:
+      return "backgammon_win";
+  }
+
+  throw std::range_error("Unsupported terminal score class.");
 }
 
 BoardState apply_move_sequence_to_board(const BoardState& board, const MoveSequence& sequence) {
@@ -406,6 +471,14 @@ Rcpp::List game_result_to_list(const GameResult& result) {
 }
 
 }  // namespace backgammonr
+
+// [[Rcpp::export]]
+std::string bg_cpp_terminal_score_class(const Rcpp::List& board, const int perspective_player) {
+  const backgammonr::BoardState parsed_board = backgammonr::parse_board_list(board);
+  return backgammonr::terminal_score_class_label(
+    backgammonr::terminal_score_class(parsed_board, perspective_player)
+  );
+}
 
 // [[Rcpp::export]]
 Rcpp::List bg_cpp_apply_move_sequence(const Rcpp::List& board, const Rcpp::List& move_sequence) {

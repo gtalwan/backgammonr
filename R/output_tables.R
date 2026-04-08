@@ -1,3 +1,4 @@
+# Legacy output-table formatters and report-facing table builders.
 bg_has_non_missing <- function(x) {
   any(!is.na(x))
 }
@@ -15,6 +16,14 @@ bg_truncate_rows <- function(df, n, arg_name = "n") {
   utils::head(df, n)
 }
 
+bg_first_present_column <- function(df, candidates) {
+  hit <- candidates[candidates %in% names(df)]
+  if (length(hit) == 0L) {
+    return(NULL)
+  }
+  hit[[1L]]
+}
+
 bg_compact_action_table <- function(results, n = NULL, include_interval = TRUE) {
   results <- as.data.frame(results, stringsAsFactors = FALSE)
   if (nrow(results) == 0L) {
@@ -29,6 +38,13 @@ bg_compact_action_table <- function(results, n = NULL, include_interval = TRUE) 
 
   results <- bg_truncate_rows(results, n, "n")
 
+  estimate_col <- bg_first_present_column(results, c("estimate", "reference_mean"))
+  uncertainty_col <- bg_first_present_column(results, c("posterior_sd", "reference_se"))
+  prob_best_col <- bg_first_present_column(results, c("prob_best", "model_relative_prob_best"))
+  regret_col <- bg_first_present_column(results, c("posterior_expected_regret", "model_relative_expected_regret"))
+  lower_col <- bg_first_present_column(results, c("lower_95", "reference_mc_lower_95"))
+  upper_col <- bg_first_present_column(results, c("upper_95", "reference_mc_upper_95"))
+
   out <- data.frame(
     rank = if ("rank" %in% names(results)) results$rank else seq_len(nrow(results)),
     action_id = if ("candidate_index" %in% names(results)) results$candidate_index else seq_len(nrow(results)),
@@ -39,11 +55,11 @@ bg_compact_action_table <- function(results, n = NULL, include_interval = TRUE) 
       rep(FALSE, nrow(results))
     },
     alloc_n = if ("allocation_count" %in% names(results)) results$allocation_count else NA_integer_,
-    estimate = if ("estimate" %in% names(results)) results$estimate else NA_real_,
-    uncertainty_sd = if ("posterior_sd" %in% names(results)) results$posterior_sd else NA_real_,
-    prob_best = if ("prob_best" %in% names(results)) results$prob_best else NA_real_,
-    exp_regret = if ("posterior_expected_regret" %in% names(results)) {
-      results$posterior_expected_regret
+    estimate = if (!is.null(estimate_col)) results[[estimate_col]] else NA_real_,
+    uncertainty_sd = if (!is.null(uncertainty_col)) results[[uncertainty_col]] else NA_real_,
+    prob_best = if (!is.null(prob_best_col)) results[[prob_best_col]] else NA_real_,
+    exp_regret = if (!is.null(regret_col)) {
+      results[[regret_col]]
     } else {
       NA_real_
     },
@@ -51,11 +67,28 @@ bg_compact_action_table <- function(results, n = NULL, include_interval = TRUE) 
   )
 
   if (isTRUE(include_interval) &&
-      all(c("lower_95", "upper_95") %in% names(results)) &&
-      bg_has_non_missing(results$lower_95) &&
-      bg_has_non_missing(results$upper_95)) {
-    out$ci95_low <- results$lower_95
-    out$ci95_high <- results$upper_95
+      !is.null(lower_col) &&
+      !is.null(upper_col) &&
+      bg_has_non_missing(results[[lower_col]]) &&
+      bg_has_non_missing(results[[upper_col]])) {
+    out$ci95_low <- results[[lower_col]]
+    out$ci95_high <- results[[upper_col]]
+  }
+
+  if ("proxy_reference_rank" %in% names(results)) {
+    out$reference_rank <- results$proxy_reference_rank
+  }
+  if ("simple_regret" %in% names(results)) {
+    out$simple_regret <- results$simple_regret
+  }
+  if ("unresolved_fraction" %in% names(results)) {
+    out$unresolved_frac <- results$unresolved_fraction
+  } else if (all(c("unresolved", "allocation_count") %in% names(results))) {
+    out$unresolved_frac <- ifelse(
+      results$allocation_count > 0L,
+      results$unresolved / results$allocation_count,
+      NA_real_
+    )
   }
 
   drop_cols <- character(0L)
@@ -67,6 +100,15 @@ bg_compact_action_table <- function(results, n = NULL, include_interval = TRUE) 
   }
   if (!bg_has_non_missing(out$uncertainty_sd)) {
     drop_cols <- c(drop_cols, "uncertainty_sd")
+  }
+  if ("reference_rank" %in% names(out) && !bg_has_non_missing(out$reference_rank)) {
+    drop_cols <- c(drop_cols, "reference_rank")
+  }
+  if ("simple_regret" %in% names(out) && !bg_has_non_missing(out$simple_regret)) {
+    drop_cols <- c(drop_cols, "simple_regret")
+  }
+  if ("unresolved_frac" %in% names(out) && !bg_has_non_missing(out$unresolved_frac)) {
+    drop_cols <- c(drop_cols, "unresolved_frac")
   }
   if ("ci95_low" %in% names(out) && !bg_has_non_missing(out$ci95_low)) {
     drop_cols <- c(drop_cols, "ci95_low", "ci95_high")
@@ -288,4 +330,104 @@ bg_compact_method_comparison_table <- function(summary_df, n = NULL) {
   estimate_col <- if ("estimate" %in% names(out)) out$estimate else rep(NA_real_, nrow(out))
   out <- out[order(order_key, -estimate_col, out$method), , drop = FALSE]
   bg_truncate_rows(out, n, "n")
+}
+
+bg_compact_truth_table <- function(x, n = 8L) {
+  n <- bg_coerce_integerish(n, "n", 1L)
+
+  if (inherits(x, "bg_truth_battery")) {
+    df <- x$summary
+    keep <- intersect(
+      c(
+        "problem_id",
+        "opening_roll",
+        "n_moves",
+        "best_move_label",
+        "top_two_gap_estimate",
+        "n_near_optimal",
+        "mc_not_separated_from_best_set_size",
+        "mean_reference_se",
+        "difficulty_label"
+      ),
+      names(df)
+    )
+    out <- df[, keep, drop = FALSE]
+    if ("best_move_label" %in% names(out)) {
+      names(out)[names(out) == "best_move_label"] <- "truth_best_move"
+    }
+    out <- out[order(out$top_two_gap_estimate), , drop = FALSE]
+    return(bg_round_display_table(bg_truncate_rows(out, n, "n")))
+  }
+
+  diag <- bg_truth_diagnostics(x, top_n = n)
+  if (is.list(diag) && "move_table" %in% names(diag)) {
+    return(bg_round_display_table(diag$move_table))
+  }
+
+  bg_round_display_table(bg_truncate_rows(as.data.frame(diag, stringsAsFactors = FALSE), n, "n"))
+}
+
+bg_compact_reference_aware_table <- function(
+    x,
+    truth = NULL,
+    checkpoints = NULL,
+    top_k = 3L,
+    epsilon = 0.01,
+    gap_tol = 0.01,
+    n = NULL) {
+  out <- bg_eval_reference_aware(
+    x = x,
+    truth = truth,
+    checkpoints = checkpoints,
+    top_k = top_k,
+    epsilon = epsilon,
+    gap_tol = gap_tol
+  )
+
+  keep <- intersect(
+    c(
+      "problem_id",
+      "allocation_policy",
+      "checkpoint",
+      "seed",
+      "recommended_move_label",
+      "truth_best_move_label",
+      "top1_match",
+      "simple_regret",
+      "spearman",
+      "top_k_overlap",
+      "pairwise_ordering_accuracy",
+      "share_top_k_truth",
+      "share_mc_screened_suboptimal",
+      "allocation_entropy",
+      "near_tie",
+      "chosen_mc_not_separated_from_best"
+    ),
+    names(out)
+  )
+  out <- out[, keep, drop = FALSE]
+  bg_round_display_table(bg_truncate_rows(out, n, "n"))
+}
+
+bg_compact_state_battery_table <- function(x, n = NULL) {
+  if (!inherits(x, "bg_state_battery")) {
+    stop("`x` must inherit from class 'bg_state_battery'.", call. = FALSE)
+  }
+
+  out <- x$state_table[, intersect(
+    c(
+      "problem_id",
+      "sample_seed",
+      "game_index",
+      "turn_index",
+      "state_class",
+      "n_legal_moves",
+      "top_two_gap_estimate",
+      "n_near_optimal",
+      "difficulty_score"
+    ),
+    names(x$state_table)
+  ), drop = FALSE]
+  out <- out[order(out$state_class, out$top_two_gap_estimate), , drop = FALSE]
+  bg_round_display_table(bg_truncate_rows(out, n, "n"))
 }

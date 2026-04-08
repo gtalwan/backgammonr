@@ -4,6 +4,7 @@
 # R session state
 .Rhistory
 .RData
+.RDataTmp
 .Ruserdata
 
 # Local dev library folders
@@ -19,8 +20,15 @@ src/*.dylib
 # Render/build outputs
 vignettes/*.html
 vignettes/*.pdf
-!vignettes/06_main_question_example_quick.pdf
 tests/testthat/Rplots.pdf
+figure/
+vignettes/_example_outputs/
+artifacts/**/*.rds
+artifacts/**/*.csv
+artifacts/**/*.png
+artifacts/**/*.pdf
+artifacts/**/*.html
 
 # Package build artifacts
 *.tar.gz
+.Rproj.user

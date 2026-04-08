@@ -1,79 +1,89 @@
 # backgammonr NEWS
 
-## 0.2.1
+## 0.3.0
 
-### Package framing and metadata
+### Package cleanup and workflow rebuild
 
-- Reorganized the package-facing documentation around the actual research
-  problem: finite-budget rollout allocation with Thompson sampling as the
-  conceptual center.
-- Replaced placeholder package metadata in `DESCRIPTION` with repository-aligned
-  maintainer and author information.
-- Added repository metadata fields for GitHub URL and issue tracking.
-- Kept the package under the standard R-compatible MIT declaration
-  (`MIT + file LICENSE`) and added a human-readable MIT license text for the
-  repository.
+- Removed the old mixed vignette stack, generated vignette outputs, scratch
+  scripts, and redundant narrative docs.
+- Rebuilt the vignette system from scratch as a sequential `00`--`15`
+  workflow centered on cached truth objects and later analysis/loading steps.
+- Added cleanup and scientific reframing docs:
+  - `docs/CLEANUP_MANIFEST.md`
+  - `docs/RESEARCH_REFRAMING_FIRST_PASS.md`
+- Added an `artifacts/` convention for saved truth objects, study objects, and
+  presentation-ready outputs without polluting the package source tree.
 
-### Core action-evaluation workflow
+### TS-first redesign
 
-- Thompson sampling and Top-Two Thompson remain the primary finite-budget
-  methods:
-  - `evaluate_actions_thompson()`
-  - `evaluate_actions_ttts()`
-  - `trace_thompson_allocation()`
-- Baseline comparison methods remain available for controlled experiments:
-  - `evaluate_actions_equal()`
-  - `evaluate_actions_greedy()`
-  - `evaluate_actions_ucb()`
-  - `evaluate_actions_ocba()`
-- Runtime fields are propagated through evaluation outputs so higher-level
-  studies and benchmarks can summarize speed/accuracy tradeoffs without wrapping
-  every call in extra timing code.
+- Repositioned `backgammonr` as a Thompson-sampling toolkit for fixed-budget
+  best-action identification under Monte Carlo noise.
+- Added a new TS-first public workflow:
+  - `bg_problem()`
+  - `bg_ts_decide()`
+  - `bg_reference()`
+  - `bg_ts_profile()`
+  - `bg_compare_methods()`
+  - `bg_opening_study()`
+  - `bg_game_trace()`
+  - `bg_board_features()`
+  - `bg_structure_study()`
+- Added research-facing wrappers and utilities for the sequential workflow:
+  - `bg_ts_run()`
+  - `bg_ts_posterior_summary()`
+  - `bg_study_save()`
+  - `bg_study_load()`
+  - `bg_move_features()`
+- Added consistent TS-first object classes with `print()`, `summary()`,
+  `plot()`, `autoplot()`, and `as_tibble()` methods.
 
-### Reference estimation and method comparison
+### Proxy-reference engine
 
-- The package keeps a dedicated reference-estimation workflow for proxy truth:
-  - `approximate_action_reference()`
-  - `approximate_action_truth()`
-  - `certify_reference_truth()`
-- Thompson/reference comparison helpers remain first-class:
-  - `compare_thompson_to_reference()`
-  - `compare_methods_on_position()`
-- The central comparison metrics remain:
-  - proxy probability of correct selection;
-  - simple regret;
-  - action-value MSE;
-  - runtime.
+- Added a parallel rollout-block backend in `src/bg_parallel.cpp` using
+  `RcppParallel` and TBB.
+- Added deterministic proxy-reference aggregation so worker-count changes do
+  not change the resulting estimates when the seed is fixed.
+- Added focused proxy-reference mode as an explicit approximation on top of the
+  equal-reference baseline.
+- Kept sequential Thompson sampling as the canonical semantics while exposing
+  batched Thompson as an experimental acceleration mode.
 
-### Research helpers and repeated studies
+### Studies and visuals
 
-- Budget and variance-study helpers remain part of the core statistical API:
-  - `study_budget_tradeoff()`
-  - `study_variance_controls()`
-- Benchmarking helpers support repeated multi-case evaluation:
-  - `benchmark_allocation_methods()`
-  - `benchmark_thompson()`
-  - `summarize_thompson_benchmark()`
-- Benchmark configuration continues to support crossed settings over methods,
-  budgets, dice-mode choices, and common-random-number controls.
+- Added TS-budget profiles, method-comparison studies, opening-roll atlas
+  workflows, move-by-move game-trace studies, and experimental structure
+  studies.
+- Added reference-aware evaluation and cleaner TS diagnostics for ranking,
+  allocation, seed variability, and gap-aware correctness:
+  - `bg_eval_reference_aware()`
+  - `plot_bg_gap()`
+  - `plot_bg_allocation()`
+  - `plot_bg_runtime_scaling()`
+- Added budget-path, allocation-flow, probability-best, seed-heatmap,
+  opening-atlas, game-trace, and structure-map plotting helpers.
+- Tightened user-facing language around:
+  - rollout-model values;
+  - proxy references;
+  - unavailable game-theoretic truth.
 
-### Visualization and reporting
+### Documentation and site
 
-- Plotting and reporting remain organized around interpretable statistical
-  outputs rather than raw engine internals.
-- The package keeps convenience helpers for allocation traces, convergence
-  checks, benchmark summaries, and narrative reports:
-  - `plot_thompson_convergence()`
-  - `plot_thompson_vs_baselines()`
-  - `bg_plot_benchmark_summary()`
-  - `bg_analysis_report()`
+- Rewrote `README.md` around the TS-first workflow and added an opening-study
+  figure.
+- Updated the package title and description in `DESCRIPTION`.
+- Added `_pkgdown.yml` with a TS-first homepage and reference sections.
+- Added new vignettes for:
+  - getting started with Thompson sampling;
+  - TS budget profiling;
+  - TS vs TTTS vs baselines;
+  - opening-roll atlas;
+  - move-by-move game traces;
+  - proxy-reference uncertainty;
+  - experimental structured studies.
 
-### Documentation refresh
+### Compatibility
 
-- Rewrote `README.md` to emphasize the main statistical workflow and the most
-  important exported functions.
-- Reworked `DEVELOPMENT.md` into a project maintenance guide with architecture,
-  invariants, validation rules, and next priorities.
-- Reorganized `NEWS.md` into release-oriented sections instead of an ungrouped
-  feature dump.
-- Kept the vignette stack aligned with the Thompson-centered package framing.
+- Kept the legacy evaluation and comparison helpers available so existing
+  workflows, including the locked easy-function-call vignette, continue to run.
+- Preserved the distinction between exact-semantics speedups and optional
+  advanced modes such as batched TS, CRN, and stratified dice.

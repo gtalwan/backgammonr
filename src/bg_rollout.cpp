@@ -1,3 +1,4 @@
+// Rollout-based move evaluation and move-choice kernels.
 #include "bg_rollout.h"
 
 #include <stdexcept>

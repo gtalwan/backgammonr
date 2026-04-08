@@ -1,2 +1,0 @@
-"method","total_budget","n_candidates","recommended_index","recommended_move_label","recommended_estimate","recommended_prob_best","recommended_expected_regret","recommended_allocation_count","runtime_seconds"
-"thompson",320,10,2,"24->23, 13->7",0.61764705882353,0.361328125,0.0515071652679712,49,0.202

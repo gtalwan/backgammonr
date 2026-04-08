@@ -1,3 +1,4 @@
+# Legacy recommendation helpers built on rollout evaluators and benchmark objects.
 bg_new_move_recommendation <- function(x) {
   x$board <- bg_new_board(x$board)
   x$roll <- bg_new_roll(x$roll)
@@ -88,7 +89,6 @@ bg_format_move_ranking <- function(ranking) {
 #' @inheritParams bg_board
 #'
 #' @return A validated `bg_board` object.
-#' @export
 bg_position <- function(points, bar = c(0, 0), off = c(0, 0), turn = 1L, validate = TRUE) {
   bg_board(points = points, bar = bar, off = off, turn = turn, validate = validate)
 }
@@ -108,7 +108,6 @@ bg_position <- function(points, bar = c(0, 0), off = c(0, 0), turn = 1L, validat
 #'
 #' @return A data frame sorted from best to worst with one row per legal move.
 #'   The data frame includes a `move` list-column of `bg_move_sequence` objects.
-#' @export
 #'
 #' @examples
 #' points <- integer(24)
@@ -170,7 +169,6 @@ bg_rank_moves <- function(
 #'
 #' @return A `bg_move_recommendation` object with elements `recommended_move`,
 #'   `ranking`, and `explanation`.
-#' @export
 #'
 #' @examples
 #' points <- integer(24)
@@ -273,7 +271,6 @@ bg_recommend_move <- function(
 #' @inheritParams bg_rank_moves
 #'
 #' @return A character scalar.
-#' @export
 bg_explain_recommendation <- function(
     x,
     roll = NULL,
@@ -324,7 +321,6 @@ bg_explain_recommendation <- function(
 #' @param ... Unused.
 #'
 #' @return The input object, invisibly.
-#' @export
 print.bg_move_recommendation <- function(x, n = 10L, ...) {
   if (!inherits(x, "bg_move_recommendation")) {
     stop("`x` must inherit from class 'bg_move_recommendation'.", call. = FALSE)

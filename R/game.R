@@ -1,3 +1,4 @@
+# Turn-level and game-level simulation wrappers around the C++ engine.
 bg_match_engine_selection <- function(selection) {
   match.arg(
     selection,

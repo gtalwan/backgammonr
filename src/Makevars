@@ -1,1 +1,2 @@
 CXX_STD = CXX17
+PKG_LIBS += $(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript" -e "cat(RcppParallel::RcppParallelLibs(), sprintf('-Wl,-rpath,%s', system.file('lib', package = 'RcppParallel')))")

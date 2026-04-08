@@ -1,3 +1,4 @@
+# Heuristic move-choice utilities and heuristic-player game wrappers.
 bg_match_heuristic_selection <- function(selection) {
   match.arg(selection, choices = c("aggressive", "defensive"))
 }

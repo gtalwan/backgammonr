@@ -214,7 +214,32 @@ These wrappers expose the same core question through different experimental view
 - Posterior intervals are normal-approx around Beta mean, not exact quantiles.
 - Approximate truth is still simulation-based, not exact game-theoretic truth.
 
-## 12) Improvement Roadmap (Next)
+## 12) Parallel Truth And Cached Study Workflow
+
+The package now treats high-budget truth construction and repeated-seed studies
+as **saved workflow stages**, not ad hoc vignette chunks.
+
+The intended sequence is:
+
+1. build large proxy truths early;
+2. save them to cache;
+3. run seed sweeps and comparison studies against those fixed references;
+4. load the saved objects in later analytical vignettes.
+
+Important implementation consequences:
+
+- truth construction supports multi-core execution through the parallel rollout
+  block backend;
+- study objects are saved as `.rds` artifacts so later analyses do not rebuild
+  expensive Monte Carlo results;
+- reproducibility is handled at the workflow boundary through explicit seeds and
+  saved metadata.
+
+This is the right level for parallelism in the current package: accelerate
+large reference builds and repeated studies, while keeping the core sequential
+TS semantics intact.
+
+## 13) Improvement Roadmap (Next)
 
 These are practical next optimizations that preserve package scope:
 
@@ -224,21 +249,22 @@ These are practical next optimizations that preserve package scope:
 2. **Cheaper posterior diagnostics option**
 - Add `diagnostic_draws` parameter to tune cost/precision of `prob_best` and expected regret.
 
-3. **Tighter OCBA implementation variant**
-- Add a more explicit finite-budget OCBA heuristic variant for side-by-side comparison.
+3. **True pure-exploration baseline**
+- Replace the current OCBA-style surrogate with a dedicated Successive Rejects
+  or LUCB implementation for fixed-budget best-arm identification studies.
 
 4. **Profiling hooks per internal phase**
 - Optional counters for rollout phases (selection, simulation, update) in one returned profile object.
 
-5. **Optional parallel backend (default off)**
-- Keep single-core fast path as default,
-- allow opt-in parallel budget splitting with deterministic seed partitioning.
+5. **Pairwise / CRN kernels**
+- Move paired-difference and CRN-heavy comparisons into tighter C++ loops once
+  profiling shows they are material bottlenecks.
 
 6. **Rollout-specific compressed state experiment**
 - Investigate a narrower rollout-only state struct for further cache gains,
 - keep public API unchanged.
 
-## 13) Practical Recommendation
+## 14) Practical Recommendation
 
 For statistical studies where throughput matters most:
 

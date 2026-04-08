@@ -204,6 +204,18 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// bg_cpp_terminal_score_class
+std::string bg_cpp_terminal_score_class(const Rcpp::List& board, const int perspective_player);
+RcppExport SEXP _backgammonr_bg_cpp_terminal_score_class(SEXP boardSEXP, SEXP perspective_playerSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type board(boardSEXP);
+    Rcpp::traits::input_parameter< const int >::type perspective_player(perspective_playerSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_terminal_score_class(board, perspective_player));
+    return rcpp_result_gen;
+END_RCPP
+}
 // bg_cpp_apply_move_sequence
 Rcpp::List bg_cpp_apply_move_sequence(const Rcpp::List& board, const Rcpp::List& move_sequence);
 RcppExport SEXP _backgammonr_bg_cpp_apply_move_sequence(SEXP boardSEXP, SEXP move_sequenceSEXP) {
@@ -510,6 +522,128 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// bg_cpp_rollout_blocks
+Rcpp::List bg_cpp_rollout_blocks(const Rcpp::List& board, const Rcpp::List& legal_moves, const Rcpp::IntegerVector& candidate_index, const Rcpp::IntegerVector& block_rollouts, const Rcpp::IntegerVector& start_counts, const std::string& rollout_policy, const int max_rollout_turns, const double unresolved_value, const std::string& dice_mode, const bool crn, const int task_block_size, const int seed, const bool use_seed);
+RcppExport SEXP _backgammonr_bg_cpp_rollout_blocks(SEXP boardSEXP, SEXP legal_movesSEXP, SEXP candidate_indexSEXP, SEXP block_rolloutsSEXP, SEXP start_countsSEXP, SEXP rollout_policySEXP, SEXP max_rollout_turnsSEXP, SEXP unresolved_valueSEXP, SEXP dice_modeSEXP, SEXP crnSEXP, SEXP task_block_sizeSEXP, SEXP seedSEXP, SEXP use_seedSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type board(boardSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type legal_moves(legal_movesSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type candidate_index(candidate_indexSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type block_rollouts(block_rolloutsSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type start_counts(start_countsSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type rollout_policy(rollout_policySEXP);
+    Rcpp::traits::input_parameter< const int >::type max_rollout_turns(max_rollout_turnsSEXP);
+    Rcpp::traits::input_parameter< const double >::type unresolved_value(unresolved_valueSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type dice_mode(dice_modeSEXP);
+    Rcpp::traits::input_parameter< const bool >::type crn(crnSEXP);
+    Rcpp::traits::input_parameter< const int >::type task_block_size(task_block_sizeSEXP);
+    Rcpp::traits::input_parameter< const int >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< const bool >::type use_seed(use_seedSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_rollout_blocks(board, legal_moves, candidate_index, block_rollouts, start_counts, rollout_policy, max_rollout_turns, unresolved_value, dice_mode, crn, task_block_size, seed, use_seed));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_posterior_sample_values
+Rcpp::NumericMatrix bg_cpp_posterior_sample_values(const Rcpp::IntegerVector& allocation_count, const Rcpp::IntegerVector& wins, const Rcpp::IntegerVector& losses, const Rcpp::IntegerVector& single_loss, const Rcpp::IntegerVector& gammon_loss, const Rcpp::IntegerVector& backgammon_loss, const Rcpp::IntegerVector& unresolved, const Rcpp::IntegerVector& single_win, const Rcpp::IntegerVector& gammon_win, const Rcpp::IntegerVector& backgammon_win, const Rcpp::NumericVector& reward_sum, const Rcpp::NumericVector& reward_sum_sq, const std::string& reward_model, const std::string& posterior_model, const double unresolved_value, const Rcpp::List& posterior_prior, const int draws);
+RcppExport SEXP _backgammonr_bg_cpp_posterior_sample_values(SEXP allocation_countSEXP, SEXP winsSEXP, SEXP lossesSEXP, SEXP single_lossSEXP, SEXP gammon_lossSEXP, SEXP backgammon_lossSEXP, SEXP unresolvedSEXP, SEXP single_winSEXP, SEXP gammon_winSEXP, SEXP backgammon_winSEXP, SEXP reward_sumSEXP, SEXP reward_sum_sqSEXP, SEXP reward_modelSEXP, SEXP posterior_modelSEXP, SEXP unresolved_valueSEXP, SEXP posterior_priorSEXP, SEXP drawsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type allocation_count(allocation_countSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type wins(winsSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type losses(lossesSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type single_loss(single_lossSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type gammon_loss(gammon_lossSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type backgammon_loss(backgammon_lossSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type unresolved(unresolvedSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type single_win(single_winSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type gammon_win(gammon_winSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type backgammon_win(backgammon_winSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type reward_sum(reward_sumSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type reward_sum_sq(reward_sum_sqSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type reward_model(reward_modelSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type posterior_model(posterior_modelSEXP);
+    Rcpp::traits::input_parameter< const double >::type unresolved_value(unresolved_valueSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type posterior_prior(posterior_priorSEXP);
+    Rcpp::traits::input_parameter< const int >::type draws(drawsSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_posterior_sample_values(allocation_count, wins, losses, single_loss, gammon_loss, backgammon_loss, unresolved, single_win, gammon_win, backgammon_win, reward_sum, reward_sum_sq, reward_model, posterior_model, unresolved_value, posterior_prior, draws));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_posterior_summary
+Rcpp::DataFrame bg_cpp_posterior_summary(const Rcpp::IntegerVector& allocation_count, const Rcpp::IntegerVector& wins, const Rcpp::IntegerVector& losses, const Rcpp::IntegerVector& single_loss, const Rcpp::IntegerVector& gammon_loss, const Rcpp::IntegerVector& backgammon_loss, const Rcpp::IntegerVector& unresolved, const Rcpp::IntegerVector& single_win, const Rcpp::IntegerVector& gammon_win, const Rcpp::IntegerVector& backgammon_win, const Rcpp::NumericVector& reward_sum, const Rcpp::NumericVector& reward_sum_sq, const std::string& reward_model, const std::string& posterior_model, const double unresolved_value, const Rcpp::List& posterior_prior, const int draws);
+RcppExport SEXP _backgammonr_bg_cpp_posterior_summary(SEXP allocation_countSEXP, SEXP winsSEXP, SEXP lossesSEXP, SEXP single_lossSEXP, SEXP gammon_lossSEXP, SEXP backgammon_lossSEXP, SEXP unresolvedSEXP, SEXP single_winSEXP, SEXP gammon_winSEXP, SEXP backgammon_winSEXP, SEXP reward_sumSEXP, SEXP reward_sum_sqSEXP, SEXP reward_modelSEXP, SEXP posterior_modelSEXP, SEXP unresolved_valueSEXP, SEXP posterior_priorSEXP, SEXP drawsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type allocation_count(allocation_countSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type wins(winsSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type losses(lossesSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type single_loss(single_lossSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type gammon_loss(gammon_lossSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type backgammon_loss(backgammon_lossSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type unresolved(unresolvedSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type single_win(single_winSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type gammon_win(gammon_winSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type backgammon_win(backgammon_winSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type reward_sum(reward_sumSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type reward_sum_sq(reward_sum_sqSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type reward_model(reward_modelSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type posterior_model(posterior_modelSEXP);
+    Rcpp::traits::input_parameter< const double >::type unresolved_value(unresolved_valueSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type posterior_prior(posterior_priorSEXP);
+    Rcpp::traits::input_parameter< const int >::type draws(drawsSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_posterior_summary(allocation_count, wins, losses, single_loss, gammon_loss, backgammon_loss, unresolved, single_win, gammon_win, backgammon_win, reward_sum, reward_sum_sq, reward_model, posterior_model, unresolved_value, posterior_prior, draws));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_reference_summary
+Rcpp::DataFrame bg_cpp_reference_summary(const Rcpp::IntegerVector& allocation_count, const Rcpp::IntegerVector& unresolved, const Rcpp::NumericVector& reward_sum, const Rcpp::NumericVector& reward_sum_sq, const double prior_alpha, const double prior_beta);
+RcppExport SEXP _backgammonr_bg_cpp_reference_summary(SEXP allocation_countSEXP, SEXP unresolvedSEXP, SEXP reward_sumSEXP, SEXP reward_sum_sqSEXP, SEXP prior_alphaSEXP, SEXP prior_betaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type allocation_count(allocation_countSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type unresolved(unresolvedSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type reward_sum(reward_sumSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type reward_sum_sq(reward_sum_sqSEXP);
+    Rcpp::traits::input_parameter< const double >::type prior_alpha(prior_alphaSEXP);
+    Rcpp::traits::input_parameter< const double >::type prior_beta(prior_betaSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_reference_summary(allocation_count, unresolved, reward_sum, reward_sum_sq, prior_alpha, prior_beta));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_eval_path_metrics
+Rcpp::List bg_cpp_eval_path_metrics(const Rcpp::IntegerVector& checkpoint, const Rcpp::NumericVector& runtime_seconds, const Rcpp::LogicalVector& top1_match, const Rcpp::LogicalVector& epsilon_optimal, const Rcpp::NumericVector& simple_regret, const Rcpp::NumericVector& recommended_prob_best);
+RcppExport SEXP _backgammonr_bg_cpp_eval_path_metrics(SEXP checkpointSEXP, SEXP runtime_secondsSEXP, SEXP top1_matchSEXP, SEXP epsilon_optimalSEXP, SEXP simple_regretSEXP, SEXP recommended_prob_bestSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type checkpoint(checkpointSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type runtime_seconds(runtime_secondsSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::LogicalVector& >::type top1_match(top1_matchSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::LogicalVector& >::type epsilon_optimal(epsilon_optimalSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type simple_regret(simple_regretSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type recommended_prob_best(recommended_prob_bestSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_eval_path_metrics(checkpoint, runtime_seconds, top1_match, epsilon_optimal, simple_regret, recommended_prob_best));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_calibration_summary
+Rcpp::DataFrame bg_cpp_calibration_summary(const Rcpp::NumericVector& predicted_prob, const Rcpp::NumericVector& observed_top1, const int bins);
+RcppExport SEXP _backgammonr_bg_cpp_calibration_summary(SEXP predicted_probSEXP, SEXP observed_top1SEXP, SEXP binsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type predicted_prob(predicted_probSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type observed_top1(observed_top1SEXP);
+    Rcpp::traits::input_parameter< const int >::type bins(binsSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_calibration_summary(predicted_prob, observed_top1, bins));
+    return rcpp_result_gen;
+END_RCPP
+}
 // bg_cpp_random_move_choice
 Rcpp::List bg_cpp_random_move_choice(const Rcpp::List& legal_moves, const int seed, const bool use_seed);
 RcppExport SEXP _backgammonr_bg_cpp_random_move_choice(SEXP legal_movesSEXP, SEXP seedSEXP, SEXP use_seedSEXP) {
@@ -680,6 +814,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_backgammonr_bg_cpp_board_validate", (DL_FUNC) &_backgammonr_bg_cpp_board_validate, 1},
     {"_backgammonr_bg_cpp_roll_create", (DL_FUNC) &_backgammonr_bg_cpp_roll_create, 2},
     {"_backgammonr_bg_cpp_roll_dice", (DL_FUNC) &_backgammonr_bg_cpp_roll_dice, 3},
+    {"_backgammonr_bg_cpp_terminal_score_class", (DL_FUNC) &_backgammonr_bg_cpp_terminal_score_class, 2},
     {"_backgammonr_bg_cpp_apply_move_sequence", (DL_FUNC) &_backgammonr_bg_cpp_apply_move_sequence, 2},
     {"_backgammonr_bg_cpp_play_turn_with_roll", (DL_FUNC) &_backgammonr_bg_cpp_play_turn_with_roll, 5},
     {"_backgammonr_bg_cpp_play_turn_random", (DL_FUNC) &_backgammonr_bg_cpp_play_turn_random, 4},
@@ -700,6 +835,12 @@ static const R_CallMethodDef CallEntries[] = {
     {"_backgammonr_bg_cpp_move_sequence_create", (DL_FUNC) &_backgammonr_bg_cpp_move_sequence_create, 2},
     {"_backgammonr_bg_cpp_move_sequence_create_with_roll", (DL_FUNC) &_backgammonr_bg_cpp_move_sequence_create_with_roll, 3},
     {"_backgammonr_bg_cpp_legal_moves", (DL_FUNC) &_backgammonr_bg_cpp_legal_moves, 3},
+    {"_backgammonr_bg_cpp_rollout_blocks", (DL_FUNC) &_backgammonr_bg_cpp_rollout_blocks, 13},
+    {"_backgammonr_bg_cpp_posterior_sample_values", (DL_FUNC) &_backgammonr_bg_cpp_posterior_sample_values, 17},
+    {"_backgammonr_bg_cpp_posterior_summary", (DL_FUNC) &_backgammonr_bg_cpp_posterior_summary, 17},
+    {"_backgammonr_bg_cpp_reference_summary", (DL_FUNC) &_backgammonr_bg_cpp_reference_summary, 6},
+    {"_backgammonr_bg_cpp_eval_path_metrics", (DL_FUNC) &_backgammonr_bg_cpp_eval_path_metrics, 6},
+    {"_backgammonr_bg_cpp_calibration_summary", (DL_FUNC) &_backgammonr_bg_cpp_calibration_summary, 3},
     {"_backgammonr_bg_cpp_random_move_choice", (DL_FUNC) &_backgammonr_bg_cpp_random_move_choice, 3},
     {"_backgammonr_bg_cpp_rollout_move_evaluate", (DL_FUNC) &_backgammonr_bg_cpp_rollout_move_evaluate, 7},
     {"_backgammonr_bg_cpp_rollout_move_choice", (DL_FUNC) &_backgammonr_bg_cpp_rollout_move_choice, 7},

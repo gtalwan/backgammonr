@@ -1,3 +1,4 @@
+# Legacy visualization helpers retained for compatibility.
 bg_match_board_perspective <- function(perspective) {
   match.arg(perspective, choices = c("player_1", "player_2"))
 }
@@ -69,7 +70,6 @@ bg_plot_highlight_points <- function(highlight_points = NULL, highlight_move = N
 #'   destination points.
 #'
 #' @return A single character string.
-#' @export
 format.bg_board <- function(
     x,
     ...,
@@ -239,7 +239,6 @@ bg_draw_board_labels <- function(board, positions, perspective) {
 #' @param ... Unused.
 #'
 #' @return The input board, invisibly.
-#' @export
 plot.bg_board <- function(
     x,
     y = NULL,
@@ -275,7 +274,6 @@ plot.bg_board <- function(
 #' @inheritParams plot.bg_board
 #'
 #' @return The input board, invisibly.
-#' @export
 bg_plot_board <- function(board, ...) {
   plot.bg_board(board, ...)
 }
@@ -292,7 +290,6 @@ bg_plot_board <- function(board, ...) {
 #' @param ... Passed to [plot.bg_board()].
 #'
 #' @return A named list containing the plotted boards.
-#' @export
 bg_compare_boards <- function(
     before,
     after,
@@ -321,7 +318,6 @@ bg_compare_boards <- function(
 #' @param ... Passed to [bg_compare_boards()].
 #'
 #' @return A list with `before`, `after`, and `move`.
-#' @export
 bg_plot_move <- function(board, move, perspective = c("player_1", "player_2"), ...) {
   move <- bg_as_move_sequence(move)
   after <- bg_apply_move_sequence(board, move)
@@ -358,7 +354,6 @@ bg_shorten_label <- function(x, max_chars = 28L) {
 #'   `method` is supplied.
 #'
 #' @return A list with plotted ranking data.
-#' @export
 bg_plot_legal_moves <- function(
     board,
     roll,
@@ -447,7 +442,6 @@ bg_extract_ranking_table <- function(x) {
 #' @param ... Unused.
 #'
 #' @return The plotting data frame, invisibly.
-#' @export
 bg_plot_move_ranking <- function(x, main = "Move ranking with uncertainty", ...) {
   tab <- bg_extract_ranking_table(x)
   if (nrow(tab) == 0L) {
@@ -502,7 +496,6 @@ bg_plot_move_ranking <- function(x, main = "Move ranking with uncertainty", ...)
 #' @param ... Unused.
 #'
 #' @return Trace rows used in the plot, invisibly.
-#' @export
 bg_plot_allocation_trace <- function(
     x,
     top_n = 4L,
@@ -583,7 +576,6 @@ bg_plot_allocation_trace <- function(
 #' @param ... Unused.
 #'
 #' @return A data frame of budget-by-method recommendations, invisibly.
-#' @export
 bg_plot_budget_stability <- function(
     board,
     roll,
@@ -675,7 +667,6 @@ bg_plot_budget_stability <- function(
 #' @param ... Unused.
 #'
 #' @return Summary rows used in plotting, invisibly.
-#' @export
 bg_plot_benchmark_summary <- function(
     x,
     metric = c(

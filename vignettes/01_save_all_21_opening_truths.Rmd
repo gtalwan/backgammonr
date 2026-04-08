@@ -1,0 +1,202 @@
+---
+title: "Save All 21 Opening Truths"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Save All 21 Opening Truths}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+library(backgammonr)
+library(knitr)
+```
+
+This notebook saves one proxy-truth file for each of the 21 unordered opening rolls.
+
+The function used here is `bg_truth_state()`.
+
+- `state` is the board we start from.
+- `roll` is the realized opening roll.
+- `budget` is the proxy-truth simulation budget.
+- `simulation_policy = "random"` means the continuation play inside the rollout is random legal play.
+- `reward_model = "scalar_payoff"` means each rollout is reduced to one scalar payoff in `[0, 1]`.
+- `posterior_model = "beta_pseudo"` means the package uses its scalar pseudo-Beta model when summarizing the move values.
+- `save_path` is the permanent `.rds` file that gets written for that roll.
+
+```{r settings}
+truth_budget <- 100000L
+truth_seed_base <- 1000L
+truth_n_cores <- 12L
+truth_parallel <- TRUE
+overwrite_truth_files <- FALSE
+
+opening_truth_dir <- file.path("artifacts", "opening_truths")
+dir.create(opening_truth_dir, recursive = TRUE, showWarnings = FALSE)
+
+opening_rolls <- data.frame(
+  die1 = c(1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 3L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 6L),
+  die2 = c(1L, 2L, 3L, 4L, 5L, 6L, 2L, 3L, 4L, 5L, 6L, 3L, 4L, 5L, 6L, 4L, 5L, 6L, 5L, 6L, 6L)
+)
+
+opening_rolls$roll_label <- paste0(opening_rolls$die1, "-", opening_rolls$die2)
+opening_rolls$save_path <- file.path(
+  opening_truth_dir,
+  paste0("opening_", opening_rolls$roll_label, "_truth_budget_", truth_budget, ".rds")
+)
+
+opening_board <- bg_initial_board()
+```
+
+```{r opening-board}
+bg_print_board(opening_board)
+```
+
+```{r all-opening-truths}
+opening_truths <- vector("list", nrow(opening_rolls))
+names(opening_truths) <- opening_rolls$roll_label
+
+for (i in seq_len(nrow(opening_rolls))) {
+  die1 <- opening_rolls$die1[[i]]
+  die2 <- opening_rolls$die2[[i]]
+  roll_label <- opening_rolls$roll_label[[i]]
+  save_path <- opening_rolls$save_path[[i]]
+
+  opening_truths[[i]] <- bg_truth_state(
+    state = opening_board,
+    roll = bg_roll(die1, die2),
+    budget = truth_budget,
+    simulation_policy = "random",
+    reward_model = "scalar_payoff",
+    posterior_model = "beta_pseudo",
+    n_cores = truth_n_cores,
+    parallel = truth_parallel,
+    cache = FALSE,
+    save_path = save_path,
+    overwrite = overwrite_truth_files,
+    seed = truth_seed_base + i - 1L,
+    problem_id = paste0("opening_", roll_label)
+  )
+}
+```
+
+```{r saved-files}
+knitr::kable(
+  opening_rolls,
+  caption = "Each opening roll is saved to its own permanent .rds file."
+)
+```
+
+```{r opening-truth-summary}
+opening_truth_summary <- do.call(
+  rbind,
+  lapply(opening_truths, function(x) x$summary)
+)
+
+opening_truth_summary <- merge(
+  opening_truth_summary,
+  opening_rolls[, c("roll_label", "die1", "die2", "save_path")],
+  by.x = "roll",
+  by.y = "roll_label",
+  all.x = TRUE,
+  sort = FALSE
+)
+
+opening_truth_summary <- opening_truth_summary[
+  order(opening_truth_summary$die1, opening_truth_summary$die2),
+  c(
+    "problem_id",
+    "roll",
+    "die1",
+    "die2",
+    "reference_budget",
+    "proxy_reference_best_move_label",
+    "top_two_gap_estimate",
+    "top_two_gap_mc_lower_95",
+    "mc_gap_excludes_zero",
+    "difficulty_label",
+    "save_path"
+  )
+]
+
+knitr::kable(
+  opening_truth_summary,
+  digits = 4,
+  caption = "Summary of the 21 saved opening-roll proxy truths."
+)
+```
+
+```{r opening-1-6-example}
+truth_1_6_path <- file.path(
+  opening_truth_dir,
+  paste0("opening_1-6_truth_budget_", truth_budget, ".rds")
+)
+
+truth_1_6 <- bg_truth_load(truth_1_6_path)
+
+knitr::kable(
+  truth_1_6$summary[, c(
+    "problem_id",
+    "reference_budget",
+    "proxy_reference_best_move_label",
+    "top_two_gap_estimate",
+    "top_two_gap_mc_lower_95",
+    "mc_gap_excludes_zero",
+    "difficulty_label"
+  )],
+  digits = 4,
+  caption = "Saved proxy-truth summary for opening roll 1-6."
+)
+```
+
+```{r opening-1-6-truth-plot, fig.width=8, fig.height=5}
+plot_bg_truth(truth_1_6)
+```
+
+```{r opening-1-6-truth-table}
+truth_1_6_table <- truth_1_6$reference$action_table[
+  order(truth_1_6$reference$action_table$rank),
+  c(
+    "rank",
+    "candidate_index",
+    "move_label",
+    "reference_mean",
+    "reference_mc_lower_95",
+    "reference_mc_upper_95",
+    "allocation_count",
+    "unresolved_fraction"
+  )
+]
+
+knitr::kable(
+  truth_1_6_table,
+  digits = 4,
+  caption = "Move table for the saved 1-6 opening-roll truth."
+)
+```
+
+
+
+```{r}
+
+truth_1_6 <- bg_truth_state(
+  state = bg_initial_board(),
+  roll = bg_roll(1L, 6L),
+  budget = 100000L,
+  simulation_policy = "random",
+  n_cores = 12L,
+  parallel = TRUE,
+  cache = FALSE,
+  save_path = file.path("artifacts", "opening_truths", "opening_1-6_truth_budget_100000.rds"),
+  overwrite = FALSE,
+  seed = 1005L,
+  problem_id = "opening_1-6"
+)
+
+
+
+```
+
+
+
+

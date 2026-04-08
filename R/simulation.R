@@ -1,3 +1,4 @@
+# Matchup and simulation helpers for repeated game experiments.
 bg_match_simulation_archetype <- function(selection) {
   match.arg(
     selection,

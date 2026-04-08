@@ -1,3 +1,4 @@
+// Dice and roll generation kernels.
 #include "bg_dice.h"
 
 #include <cstdint>

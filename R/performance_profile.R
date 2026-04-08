@@ -15,7 +15,8 @@
 #' @param seed Optional integer-like seed for reproducibility.
 #'
 #' @return A named list with timing values in seconds.
-#' @export
+#' @keywords internal
+#' @noRd
 bg_profile_runtime <- function(
     board,
     roll,

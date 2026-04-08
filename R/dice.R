@@ -1,3 +1,4 @@
+# Dice and roll constructors plus reproducible roll helpers.
 bg_new_roll <- function(x) {
   structure(x, class = "bg_roll")
 }

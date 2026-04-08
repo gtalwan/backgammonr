@@ -1,3 +1,4 @@
+// Thompson-rollout move evaluation and move-choice kernels.
 #include "bg_thompson_rollout.h"
 
 #include <stdexcept>
