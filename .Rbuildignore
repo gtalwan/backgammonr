@@ -12,5 +12,11 @@
 ^backgammonr\.Rcheck$
 ^.*\.zip$
 ^tests/testthat/Rplots\.pdf$
-^src/.*\.(o|so)$
+^cache$
+^analysis$
+^analysis/output$
+^src/.*\.(o|so|dll|dylib)$
+^figure$
+^artifacts/pilot$
+^vignettes/artifacts$
 ^vignettes/_example_outputs$

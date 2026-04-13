@@ -44,24 +44,33 @@
 #' Recommended entry points for the public interface are:
 #'
 #' - `bg_problem()` to define one state-plus-roll decision problem;
-#' - `bg_reference()`, `bg_truth_state()`, and `bg_truth_opening()` to build
-#'   or reuse proxy references;
+#' - `bg_reference()`, `bg_truth_state()`, and the `bg_opening_*()` helpers to
+#'   build or reuse proxy references for the 21 opening rolls;
 #' - `bg_study_save()` / `bg_study_load()` to keep expensive study objects
 #'   reusable;
 #' - `bg_ts_run()` and `bg_ttts_run()` for the main TS analysis loop;
-#' - `bg_reference()` to construct or extend a high-budget proxy reference;
-#' - `bg_ucb_run()` to expose an optimism-based scalar-engine comparator;
-#' - `bg_compare_algorithms()` to compare Thompson to TTTS, UCB, and baseline
-#'   allocation rules, with scalar-engine comparators restricted to
-#'   `scalar_payoff + beta_pseudo` problems in the current rescue pass;
-#' - `bg_eval_reference_aware()` and `plot_bg_budget_curve()` to summarize
-#'   finite-budget performance;
+#' - `bg_equal_run()` for the main non-TS baseline;
+#' - `bg_multi_sample_ts_run()`, `bg_soft_elimination_ts_run()`,
+#'   `bg_forced_exploration_ts_run()`, and `bg_top_k_ts_run()` for the
+#'   supported TS-family variants;
+#' - `bg_truth_certify()` to screen whether a proxy truth is separated enough
+#'   to support strong comparative claims;
+#' - `bg_sanity_lab()` to sanity-check TS and TTTS on small non-backgammon
+#'   cases with known truth;
+#' - `bg_compare_algorithms()` to compare Thompson, TTTS, and equal allocation,
+#'   with legacy scalar comparators available only when requested;
+#' - `bg_ts_diagnostics()`, `bg_eval_reference_aware()`, and
+#'   `plot_bg_budget_curve()` to summarize finite-budget performance;
 #' - `bg_compare_posteriors()` and `bg_compare_reward_models()` for the
 #'   compact model-comparison workflows.
 #'
 #' Legacy helpers remain in the source tree for compatibility and internal
 #' reuse, but they are no longer part of the package narrative. The intended
 #' workflow runs through the curated `bg_*` interface.
+#'
+#' For repo-local orientation and real example outputs, start with the analysis
+#' scripts under `analysis/`, especially
+#' `analysis/00_walkthrough_and_results.R`.
 #'
 #' Core loops use `Rcpp`, `RcppArmadillo`, and `RcppParallel` to keep canonical
 #' sequential Thompson semantics intact while accelerating proxy-reference

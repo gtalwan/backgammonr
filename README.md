@@ -1,201 +1,558 @@
 # backgammonr
 
-`backgammonr` is a research package for finite-budget Monte Carlo allocation in
-backgammon. The package treats one local backgammon decision as a stochastic
-best-action-identification problem and uses Thompson sampling as the central
-allocation rule.
+`backgammonr` is an R package for one narrow research program:
 
-This package is not trying to tell you the universal truth about backgammon.
-Its scientific object is narrower and more explicit:
+> Given a fixed simulation budget for one local backgammon decision problem,
+> how should rollouts be allocated across legal moves so the best move, or the
+> important part of the move ranking, is identified as accurately and
+> efficiently as possible under a declared rollout model?
+
+This repository is not organized as a general backgammon bot. It is organized
+as a research package with four connected layers:
+
+1. a backgammon engine
+2. a proxy-truth layer built from high-budget rollout simulation
+3. a statistical allocation layer centered on Thompson-style methods
+4. an analysis layer that compares methods against fixed truth objects
+
+The package's truth objects are always:
+
+- high-budget Monte Carlo proxy truths under the package's declared rollout environment
+
+They are not:
+
+- exact backgammon truth
+- expert truth
+- GNU Backgammon truth
+- game-theoretic equilibrium truth
+
+## Table of contents
+
+- [What this package studies](#what-this-package-studies)
+- [What the package is not](#what-the-package-is-not)
+- [Where to start in the repo](#where-to-start-in-the-repo)
+- [Core mental model](#core-mental-model)
+- [Truth, reward, posterior, and algorithm are different](#truth-reward-posterior-and-algorithm-are-different)
+- [Package architecture](#package-architecture)
+- [Main exported functions](#main-exported-functions)
+- [Game mechanics workflow](#game-mechanics-workflow)
+- [Opening-roll workflow](#opening-roll-workflow)
+- [Master truth workflow: simulate once, reuse across reward systems](#master-truth-workflow-simulate-once-reuse-across-reward-systems)
+- [Custom-board workflow](#custom-board-workflow)
+- [Reward systems](#reward-systems)
+- [Posterior models](#posterior-models)
+- [Allocation policies](#allocation-policies)
+- [Diagnostics and metrics](#diagnostics-and-metrics)
+- [Truth certification and stability](#truth-certification-and-stability)
+- [Analysis entrypoints](#analysis-entrypoints)
+- [Cache directories](#cache-directories)
+- [Performance notes](#performance-notes)
+- [Repository map](#repository-map)
+- [Reproducibility](#reproducibility)
+
+## What this package studies
+
+The package studies one object repeatedly:
 
 - one board state
 - one realized dice roll
-- the legal root moves from that state and roll
-- a finite rollout budget
-- a declared continuation policy for the rest of the game
-- a declared reward map from rollout outcomes
-- a finite-budget algorithm that learns move values under that rollout model
+- the legal moves available under that roll
+- a declared continuation rollout policy
+- a declared reward definition
+- a declared posterior model
+- a fixed simulation budget
 
-The package truth object is:
+That object is represented by `bg_problem()`.
 
-- high-budget Monte Carlo proxy truth under the package's rollout environment
+The scientific questions are then:
 
-The package truth object is not:
+1. Which method finds the best move fastest under a fixed budget?
+2. Which method allocates budget toward the truly competitive moves?
+3. How well does the method recover the move ranking, not just the winner?
+4. How sensitive are those conclusions to the chosen reward system?
+5. How stable is the high-budget proxy truth itself?
 
-- expert backgammon truth
-- strong-bot truth
-- exact game-theoretic truth
+## What the package is not
 
-## Why Backgammon Is A Good Laboratory
+`backgammonr` is intentionally not centered on:
 
-Backgammon is a good setting for finite-budget simulation allocation because a
-single local decision already has all of the hard ingredients:
+- a large method zoo
+- a large plotting zoo
+- full-game match equity
+- bot-strength move evaluation
+- polished end-user backgammon play
 
-- a discrete but nontrivial legal action set
-- noisy action values because continuation play is simulated
-- heterogeneous state difficulty
-- ranking questions, not just winner questions
-- serious runtime cost because rollouts are expensive
+The focus is narrower:
 
-The canonical opening laboratory is the set of 21 unordered opening rolls:
+- local move-choice problems
+- proxy truth from expensive rollouts
+- Thompson-style allocation methods
+- equal allocation as the simple baseline
+- clear evaluation and diagnostics
 
-- 15 non-doubles
-- 6 doubles
+## Where to start in the repo
 
-That battery matters because the initial board is fixed while the realized roll
-changes, so action count, value gaps, and difficulty all vary in a controlled
-way.
+If you are opening the repository for the first time, start here:
 
-## Core Scientific Problem
+- [`analysis/00_walkthrough_and_results.R`](analysis/00_walkthrough_and_results.R): the main guided walkthrough and results file
+- [`analysis/01_opening_truth_overview.R`](analysis/01_opening_truth_overview.R): truth-battery summaries
+- [`analysis/02_ts_vs_ttts_opening_study.R`](analysis/02_ts_vs_ttts_opening_study.R): the coherent TS vs TTTS opening study
+- [`analysis/03_build_reward_truth_caches.R`](analysis/03_build_reward_truth_caches.R): build one master opening battery, then materialize reward-specific caches
 
-For one state `s`, one realized roll `r`, and legal actions
-`A(s, r) = {a_1, ..., a_K}`, the package studies move values
+The preserved repo-local million-rollout opening cache lives in:
 
-```text
-mu_i = E[Y_i | s, r, a_i, rollout environment]
-```
+- [`cache/opening_truths_restart/`](cache/opening_truths_restart)
 
-where `Y_i` is the rollout reward for move `a_i`.
+## Core mental model
 
-The best action under the rollout model is
+The shortest practical mental model is:
 
-```text
-i* = argmax_i mu_i
-```
+- engine: backgammon mechanics
+- truth: expensive Monte Carlo reference
+- model: how finite rollout data are summarized statistically
+- algorithm: how the rollout budget is allocated
+- metrics: did it work?
 
-The finite-budget problem is:
+This separation matters.
 
-```text
-Given a total rollout budget T, how should we allocate that budget across
-legal moves so that we identify or rank the best moves as accurately and as
-quickly as possible?
-```
+The package feels complicated when those layers are blurred together. It
+becomes much easier to reason about once they are kept separate.
 
-The rollout environment is part of the estimand. It includes:
+## Truth, reward, posterior, and algorithm are different
 
-- the continuation policy, such as `simulation_policy = "random"`
-- the truncation rule, such as `max_rollout_turns = 220L`
-- the unresolved payoff, such as `unresolved_value = 0.5`
-- the reward model
+These four ideas are distinct.
 
-So the package's estimand is:
+### Truth
 
-```text
-expected move value under the declared rollout environment
-```
+Truth means:
 
-That is the package identity.
+- the high-budget reference quantity you are trying to estimate for each move
 
-## Proxy Truth
+Truth depends on things like:
 
-The package uses high-budget Monte Carlo proxy references.
+- board state
+- realized roll
+- rollout continuation policy
+- max rollout turns
+- unresolved handling
+- dice mode / CRN settings
+- reward definition
 
-For move `a_i`, if the proxy-reference rollout budget for that action is `N_i`,
-then the proxy-reference mean is
+Truth does not fundamentally depend on:
 
-```text
-mu_ref_i = (1 / N_i) * sum_{j=1}^{N_i} Y_{i,j}
-```
+- whether you later use Thompson sampling or TTTS
+- whether you later summarize uncertainty with a Student-t or Beta posterior
 
-The proxy-reference best move is the move with the largest `mu_ref_i`.
+### Reward system
 
-The usual proxy-reference Monte Carlo interval is the normal approximation
+Reward system means:
 
-```text
-mu_ref_i +/- 1.96 * SE(mu_ref_i)
-```
+- how rollout outcomes are converted into move value
 
-Important interpretation:
+Changing the reward system changes the estimand.
 
-- these are Monte Carlo intervals under the rollout model
-- they are not "truth intervals"
-- they describe uncertainty in the proxy-reference estimate itself
+### Posterior model
 
-## Minimal Workflow
+Posterior model means:
+
+- how finite rollout data are summarized into uncertainty for one move
+
+Changing the posterior model does not necessarily change the estimand. It
+changes the statistical update used by TS or TTTS.
+
+### Allocation algorithm
+
+Allocation algorithm means:
+
+- how the next rollout is assigned across competing moves
+
+Examples:
+
+- Thompson sampling
+- top-two Thompson sampling
+- equal allocation
+
+## Package architecture
+
+The cleaned repository is organized around these source files.
+
+### Engine-facing R surface
+
+- [`R/bg_engine_api.R`](R/bg_engine_api.R)
+- [`R/bg_s3_methods.R`](R/bg_s3_methods.R)
+
+### Problem and truth layer
+
+- [`R/bg_problem.R`](R/bg_problem.R)
+- [`R/bg_truth.R`](R/bg_truth.R)
+- [`R/bg_states.R`](R/bg_states.R)
+
+### Statistical algorithms and studies
+
+- [`R/bg_algorithms.R`](R/bg_algorithms.R)
+- [`R/bg_metrics.R`](R/bg_metrics.R)
+- [`R/bg_studies.R`](R/bg_studies.R)
+- [`R/bg_plots.R`](R/bg_plots.R)
+
+### Internal helpers and legacy compatibility
+
+- [`R/bg_internal_utils.R`](R/bg_internal_utils.R)
+- [`R/bg_legacy.R`](R/bg_legacy.R)
+- [`R/backgammonr-package.R`](R/backgammonr-package.R)
+
+### Core native engine files
+
+- [`src/bg_board.cpp`](src/bg_board.cpp)
+- [`src/bg_dice.cpp`](src/bg_dice.cpp)
+- [`src/bg_move.cpp`](src/bg_move.cpp)
+- [`src/bg_movegen.cpp`](src/bg_movegen.cpp)
+- [`src/bg_rules.cpp`](src/bg_rules.cpp)
+- [`src/bg_game.cpp`](src/bg_game.cpp)
+- [`src/engine_playout.cpp`](src/engine_playout.cpp)
+- [`src/engine_players.cpp`](src/engine_players.cpp)
+
+### Statistical native files
+
+- [`src/alloc_core.cpp`](src/alloc_core.cpp)
+- [`src/alloc_trace.cpp`](src/alloc_trace.cpp)
+- [`src/policy_ts.cpp`](src/policy_ts.cpp)
+- [`src/policy_ttts.cpp`](src/policy_ttts.cpp)
+- [`src/policy_equal.cpp`](src/policy_equal.cpp)
+- [`src/model_beta_bernoulli.cpp`](src/model_beta_bernoulli.cpp)
+- [`src/model_student_t.cpp`](src/model_student_t.cpp)
+- [`src/model_dirichlet_categorical.cpp`](src/model_dirichlet_categorical.cpp)
+- [`src/model_bootstrap.cpp`](src/model_bootstrap.cpp)
+- [`src/truth_proxy.cpp`](src/truth_proxy.cpp)
+- [`src/metrics_summary.cpp`](src/metrics_summary.cpp)
+
+## Main exported functions
+
+### Problem setup
+
+- `bg_problem()`
+- `bg_opening_problem()`
+- `bg_opening_rolls()`
+
+### Truth and reference
+
+- `bg_reference()`
+- `bg_truth_state()`
+- `bg_truth_battery()`
+- `bg_truth_certify()`
+- `bg_truth_stability()`
+- `bg_master_truth_state()`
+- `bg_opening_truth_build_one()`
+- `bg_opening_truth_build_all()`
+- `bg_opening_master_truth_build_one()`
+- `bg_opening_truth_load_one()`
+- `bg_opening_truth_load_all()`
+- `bg_opening_truth_index()`
+- `bg_truth_project()`
+- `bg_reference_project()`
+
+### Algorithms
+
+- `bg_ts_run()`
+- `bg_ttts_run()`
+- `bg_multi_sample_ts_run()`
+- `bg_soft_elimination_ts_run()`
+- `bg_forced_exploration_ts_run()`
+- `bg_top_k_ts_run()`
+- `bg_equal_run()`
+
+### Metrics and diagnostics
+
+- `bg_eval_top1()`
+- `bg_eval_topk()`
+- `bg_eval_rank()`
+- `bg_eval_restricted_rank()`
+- `bg_eval_allocation()`
+- `bg_eval_efficiency()`
+- `bg_eval_calibration()`
+- `bg_eval_reference_aware()`
+- `bg_ts_diagnostics()`
+- `bg_stopping_diagnostics()`
+- `bg_posterior_adequacy()`
+
+### Studies and plots
+
+- `bg_compare_algorithms()`
+- `bg_opening_compare_study()`
+- `bg_sanity_lab()`
+- `plot_bg_truth()`
+- `plot_bg_ts_trace()`
+- `plot_bg_budget_curve()`
+- `plot_bg_rank_compare()`
+- `plot_bg_allocation()`
+- `plot_bg_posterior_compare()`
+
+### Low-level engine helpers
+
+- `bg_initial_board()`
+- `bg_board()`
+- `bg_validate_board()`
+- `bg_inspect_board()`
+- `bg_print_board()`
+- `bg_roll()`
+- `bg_roll_dice()`
+- `bg_legal_moves()`
+- `bg_apply_move_sequence()`
+- `bg_play_turn()`
+- `bg_play_game()`
+
+## Game mechanics workflow
+
+This is the smallest way to see the engine in action.
 
 ```r
 library(backgammonr)
 
-problem <- bg_problem(
-  state = bg_initial_board(),
-  roll = bg_roll(1L, 6L),
-  simulation_policy = "random",
-  reward_model = "scalar_payoff",
-  posterior_model = "beta_pseudo",
-  problem_id = "opening_1-6"
-)
+board <- bg_initial_board()
+roll <- bg_roll(1, 6)
+moves <- bg_legal_moves(board, roll)
+after <- bg_apply_move_sequence(board, moves[[1]])
+turn <- bg_play_turn(board, roll = roll)
+game <- bg_play_game(board, max_turns = 12L, selection = "random", seed = 123L)
 
-truth <- bg_truth_state(
-  problem = problem,
+bg_print_board(board)
+print(roll)
+print(moves[[1]])
+bg_print_board(after)
+print(turn)
+bg_print_board(game$final_board)
+```
+
+This layer is pure game mechanics. It has nothing to do with Thompson sampling
+yet.
+
+## Opening-roll workflow
+
+The 21 unordered opening rolls are the package's main study battery.
+
+```r
+library(backgammonr)
+
+rolls <- bg_opening_rolls()
+
+truth_1_6 <- bg_opening_truth_build_one(
+  roll = "1-6",
   budget = 4096L,
   n_cores = 1L,
   parallel = FALSE,
-  save_path = file.path(tempdir(), "opening_1-6_truth.rds"),
   seed = 1L
 )
 
-fit <- bg_ts_run(
-  problem = problem,
+fit_ts <- bg_ts_run(
+  problem = truth_1_6$problem,
   budget = 256L,
   checkpoints = c(32L, 64L, 128L, 256L),
-  proxy_reference = truth$reference,
+  proxy_reference = truth_1_6$reference,
   seed = 1L
 )
 
-panel <- bg_eval_reference_aware(fit, truth = truth$reference)
-panel[, c(
-  "checkpoint",
-  "recommended_move_label",
-  "truth_best_move_label",
-  "top1_match",
-  "simple_regret",
-  "spearman"
-)]
+bg_ts_diagnostics(fit_ts, truth = truth_1_6)
 ```
 
-## Reward Models
+The opening-roll battery exists because it is:
 
-The package separates:
+- small enough to study repeatedly
+- rich enough to show hard and easy move-choice problems
+- standardized enough for coherent method comparisons
 
-- what one rollout returns
-- how uncertainty about that rollout return is modeled
+## Master truth workflow: simulate once, reuse across reward systems
 
-The reward model says what the random variable `Y` is.
+This is the most important new workflow in the cleaned package.
 
-### `reward_model = "win_loss"`
+The idea is:
 
-Each rollout returns:
+1. build one expensive truth object under the full scored-outcome representation
+2. store the per-move scored outcome counts
+3. project that truth into the reward system you want
+4. compare methods against the projected truth
 
-- `1` for win
-- `0` for loss
+This avoids rerunning a huge rollout simulation just because you changed the
+reward projection.
 
-Then
+### For one opening roll
 
-```text
-mu_i = P(win | s, r, a_i, rollout environment)
+```r
+library(backgammonr)
+
+n_cores <- max(1L, parallel::detectCores(logical = FALSE) - 1L)
+
+truth_1_6 <- bg_opening_master_truth_build_one(
+  roll = "1-6",
+  budget = 1000000L,
+  n_cores = n_cores,
+  parallel = TRUE,
+  truth_block_size = 512L,
+  cache = TRUE,
+  cache_dir = "cache/opening_truths_master",
+  overwrite = FALSE,
+  seed = 1L
+)
+
+truth_scalar <- bg_truth_project(
+  truth_1_6,
+  reward_model = "scalar_payoff",
+  posterior_model = "student_t_marginal",
+  unresolved_value = 0.5
+)
+
+truth_binary <- bg_truth_project(
+  truth_1_6,
+  reward_model = "win_loss",
+  posterior_model = "beta_bernoulli",
+  unresolved_value = 0
+)
+
+truth_categorical <- bg_truth_project(
+  truth_1_6,
+  reward_model = "categorical_outcome",
+  posterior_model = "dirichlet_multinomial",
+  unresolved_value = 0.5
+)
 ```
 
-This is the clean textbook bandit case.
+### For all 21 opening rolls
 
-### `reward_model = "scalar_payoff"`
+```r
+library(backgammonr)
 
-Each rollout returns a bounded scalar in `[0, 1]`.
+n_cores <- max(1L, parallel::detectCores(logical = FALSE) - 1L)
 
-This is the package's main scalar-valued path. It treats move value as expected
-payoff under the rollout environment:
+rolls <- bg_opening_rolls()$opening_roll
 
-```text
-mu_i = E[Y_i]
+master_truths <- setNames(
+  lapply(
+    rolls,
+    function(r) {
+      bg_opening_master_truth_build_one(
+        roll = r,
+        budget = 1000000L,
+        n_cores = n_cores,
+        parallel = TRUE,
+        truth_block_size = 512L,
+        cache = TRUE,
+        cache_dir = "cache/opening_truths_master",
+        overwrite = FALSE,
+        seed = 1L
+      )
+    }
+  ),
+  rolls
+)
 ```
 
-This is broader than pure win probability.
+### Why this matters
 
-### `reward_model = "categorical_outcome"`
+The expensive part is the rollout simulation. Once the master truth exists, the
+package already has the information needed to derive:
 
-Each rollout returns a category and then the category probabilities are mapped
-to an expected scalar payoff.
+- `scalar_payoff` truth
+- `win_loss` truth
+- `categorical_outcome` truth
 
-The full scored-outcome model usually uses 7 categories:
+for the same board, roll, and rollout environment.
+
+## Custom-board workflow
+
+The package is not restricted to the opening position.
+
+### Build a custom board directly
+
+```r
+library(backgammonr)
+
+points <- integer(24)
+points[1] <- 2L
+points[6] <- 5L
+points[8] <- 3L
+points[12] <- 5L
+points[13] <- -5L
+points[17] <- -3L
+points[19] <- -5L
+points[24] <- -2L
+
+board <- bg_board(points = points, bar = c(0L, 0L), off = c(0L, 0L), turn = 1L)
+roll <- bg_roll(3, 2)
+
+mid_truth <- bg_master_truth_state(
+  state = board,
+  roll = roll,
+  budget = 250000L,
+  n_cores = 1L,
+  parallel = FALSE,
+  cache = FALSE,
+  seed = 1L
+)
+```
+
+### Or derive a non-opening board from actual play
+
+```r
+library(backgammonr)
+
+game <- bg_play_game(
+  board = bg_initial_board(),
+  max_turns = 12L,
+  selection = "random",
+  seed = 123L
+)
+
+mid_board <- game$final_board
+mid_roll <- bg_roll_dice(seed = 999L)
+
+mid_truth <- bg_master_truth_state(
+  state = mid_board,
+  roll = mid_roll,
+  budget = 250000L,
+  n_cores = 1L,
+  parallel = FALSE,
+  cache = FALSE,
+  seed = 1L
+)
+```
+
+Use `bg_master_truth_state()` for arbitrary positions.
+
+Use `bg_opening_master_truth_build_one()` for the standard opening battery.
+
+## Reward systems
+
+The package supports three main reward definitions.
+
+### `win_loss`
+
+Binary reward:
+
+- any win category maps to `1`
+- any loss category maps to `0`
+- unresolved handling is controlled by `unresolved_value`
+
+This is the clean Bernoulli-style setup.
+
+### `scalar_payoff`
+
+Bounded scalar reward.
+
+In the current package implementation:
+
+- any win category maps to `1`
+- any loss category maps to `0`
+- unresolved maps to `unresolved_value`
+
+With the default unresolved handling, that means:
+
+- loss = `0`
+- unresolved = `0.5`
+- win = `1`
+
+This is a normalized decision-value scale, not raw backgammon points.
+
+### `categorical_outcome`
+
+Full scored outcome categories:
 
 - `single_loss`
 - `gammon_loss`
@@ -205,1063 +562,331 @@ The full scored-outcome model usually uses 7 categories:
 - `gammon_win`
 - `backgammon_win`
 
-There is also a 3-category collapse:
+This is the richest outcome representation in the package.
 
-- `loss`
-- `unresolved`
-- `win`
+Its default payoff map is:
 
-## Posterior Models And Distributions
+- backgammon loss -> `0`
+- gammon loss -> `1/6`
+- single loss -> `1/3`
+- unresolved -> `0.5`
+- single win -> `2/3`
+- gammon win -> `5/6`
+- backgammon win -> `1`
 
-The posterior model says how uncertainty about move value is represented.
+That richer categorical representation is exactly why the master-truth workflow
+can support multiple later projections.
 
-Implemented posterior families:
+## Posterior models
+
+Posterior models are grouped by reward system.
+
+### `win_loss`
+
+Central:
 
 - `beta_bernoulli`
-- `beta_pseudo`
-- `dirichlet_multinomial`
-- `gaussian_approx`
-- `normal_inverse_gamma`
-- `student_t_marginal`
+
+Secondary:
+
 - `bootstrap`
 
-The main logic lives in:
+### `scalar_payoff`
 
-- `R/bg_model_spec.R`
-- `R/bg_posterior_kernels.R`
-- `src/bg_posterior_models.cpp`
+Central:
 
-### 1. `win_loss + beta_bernoulli`
+- `beta_pseudo`
+- `student_t_marginal`
 
-This is the statistically clean binary model.
+Secondary:
 
-If move `i` has:
+- `bootstrap`
 
-- `s_i` wins
-- `f_i` losses
+### `categorical_outcome`
 
-and prior
+Central:
 
-```text
-p_i ~ Beta(alpha_0, beta_0)
-```
+- `dirichlet_multinomial`
 
-then the posterior is
+Secondary:
 
-```text
-p_i | data ~ Beta(alpha_0 + s_i, beta_0 + f_i)
-```
+- `bootstrap`
 
-Canonical Thompson then samples
+### Important distinction
 
-```text
-tilde_p_i ~ Beta(alpha_0 + s_i, beta_0 + f_i)
-```
+`reward_model` and `posterior_model` are not the same knob.
 
-and allocates to the move with the largest sampled win probability.
+- `reward_model` changes what quantity you are trying to learn
+- `posterior_model` changes how uncertainty about that quantity is summarized
 
-Status:
+## Allocation policies
 
-- exact conjugate Bayes for binary data
-- statistically clean
+The main package story is deliberately small.
 
-### 2. `scalar_payoff + beta_pseudo`
-
-This is the package's main scalar default and the main fast-path stack.
-
-If move `i` has:
-
-- `n_i` rollouts
-- reward sum `R_i = sum_j Y_{i,j}`
-
-then the package uses pseudo-counts
-
-```text
-alpha_i = alpha_0 + R_i
-beta_i  = beta_0 + n_i - R_i
-```
-
-and samples
-
-```text
-tilde_mu_i ~ Beta(alpha_i, beta_i)
-```
-
-This looks like Beta-Bernoulli Thompson, but it is not exact Bayes unless the
-data are truly Bernoulli. It is a pseudo-Bayesian approximation for bounded
-scalar payoffs.
-
-Status:
-
-- central in the package
-- approximate, not exact
-
-### 3. `categorical_outcome + dirichlet_multinomial`
-
-If move `i` has category counts `c_{i1}, ..., c_{iK}` and prior vector
-`alpha_01, ..., alpha_0K`, then
-
-```text
-theta_i | data ~ Dirichlet(alpha_01 + c_{i1}, ..., alpha_0K + c_{iK})
-```
-
-If the category payoff map is `w_1, ..., w_K`, then Thompson draws:
-
-```text
-1. draw theta_tilde_i from the Dirichlet posterior
-2. set mu_tilde_i = sum_k theta_tilde_{ik} * w_k
-```
-
-This is the most domain-faithful family in the package because it keeps scored
-outcome structure rather than collapsing everything immediately to a single
-scalar.
-
-Status:
-
-- exact conjugate Bayes for categorical data
-- statistically clean
-
-### 4. `scalar_payoff + student_t_marginal`
-
-This uses a normal-inverse-gamma style update for scalar rewards and samples
-the mean from the posterior marginal Student-t distribution.
-
-At the sufficient-statistic level it uses:
-
-- count
-- reward sum
-- reward sum of squares
-
-The package then integrates out variance and samples the mean through the
-Student-t marginal.
-
-Status:
-
-- approximate for bounded scalar rewards
-- more defensible than a plain Gaussian approximation
-
-### 5. `scalar_payoff + gaussian_approx`
-
-This uses a Gaussian approximation for the mean of a bounded scalar reward.
-
-Status:
-
-- approximate
-- secondary
-
-### 6. `scalar_payoff + normal_inverse_gamma`
-
-This models mean and variance jointly and then samples the mean conditionally.
-
-Status:
-
-- approximate for bounded payoff data
-- secondary
-
-### 7. `bootstrap`
-
-This uses resampling-style uncertainty rather than a conjugate Bayesian family.
-
-Status:
-
-- robustness comparator
-- heuristic rather than canonical Bayesian modeling
-
-## Which Model Stacks Matter Most
-
-The package supports more model families than it should headline. The main
-coherent stacks are:
-
-- `win_loss + beta_bernoulli`
-- `scalar_payoff + beta_pseudo`
-- `scalar_payoff + student_t_marginal`
-- `categorical_outcome + dirichlet_multinomial`
-
-The first and fourth are the cleanest statistically.
-
-The second is the package's main scalar baseline.
-
-The third is the main scalar alternative when you want a more explicit
-continuous posterior for the mean.
-
-## Canonical Thompson Sampling
-
-Every Thompson-style method in the package follows the same template:
-
-```text
-for t = 1, ..., T:
-  1. build a posterior for each legal move
-  2. sample one plausible move value from each posterior
-  3. choose the move with the best sampled value
-  4. simulate one rollout for that move
-  5. update only that move
-```
-
-If the posterior for move `i` at time `t` is `pi_i(. | data_t)`, then canonical
-Thompson chooses
-
-```text
-a_t = argmax_i mu_tilde_{i,t}
-where mu_tilde_{i,t} ~ pi_i(. | data_t)
-```
-
-This balances:
-
-- exploitation of moves with high posterior means
-- exploration of moves with high posterior uncertainty
-
-## Thompson Extensions In This Package
-
-The package supports several Thompson-family extensions. The central ones are:
-
-- `thompson`
-- `top_two_thompson`
-
-The rest are compare-ready but more experimental:
-
-- `multi_sample_thompson`
-- `tempered_thompson`
-- `budget_aware_thompson`
-- `elimination_thompson`
-- `ranking_aware_thompson`
-
-The selection logic is implemented in:
-
-- `R/ts_frontdoor.R`
-- `R/bg_posterior_kernels.R`
-
-### `thompson`
-
-Canonical Thompson:
-
-```text
-draw one posterior sample for each move
-pick the move with the largest draw
-```
-
-This is the baseline.
-
-### `top_two_thompson`
-
-This is the TTTS comparator.
-
-Operationally the package:
-
-- uses a larger draw matrix
-- finds a leading sampled winner
-- finds a sampled challenger
-- allocates between them using `ttts_beta`
-
-Conceptually:
-
-```text
-1. sample a current best candidate i_1
-2. sample an alternative challenger i_2
-3. allocate to i_1 with probability beta
-4. allocate to i_2 with probability 1 - beta
-```
-
-Key parameter:
-
-- `ttts_beta`
-  Probability of staying with the current Thompson winner. Smaller values force
-  more challenger sampling.
-
-Why use it:
-
-- canonical Thompson can over-commit too early when two moves are close
-- TTTS keeps explicit pressure on the near-best alternatives
-
-### `multi_sample_thompson`
-
-The package draws several Thompson winner samples, counts how often each action
-wins, and then allocates to the action with the largest winner frequency.
-
-Operationally:
-
-```text
-1. draw M posterior winner samples
-2. record which move won each draw
-3. tabulate winner frequencies
-4. allocate to the move with the highest frequency
-```
-
-Key parameter:
-
-- `multi_sample_draws`
-  Number of winner draws used in the voting step.
-
-Why use it:
-
-- reduces sensitivity to one lucky posterior draw
-- makes the policy more consensus-oriented
-
-### `tempered_thompson`
-
-The package rescales posterior dispersion before sampling.
-
-Conceptually:
-
-```text
-posterior draws are tempered around the posterior mean
-```
-
-Interpretation of `temperature`:
-
-- `temperature > 1`: noisier draws, more exploration
-- `temperature < 1`: tighter draws, more exploitation
-- `temperature = 1`: canonical Thompson
-
-Why use it:
-
-- to tune exploration pressure without adding a separate bonus term
-
-### `ranking_aware_thompson`
-
-This variant focuses on uncertainty within the near-top set.
-
-The package:
-
-- takes a draw matrix
-- keeps a focus set of size `ranking_top_k`
-- computes pairwise uncertainty inside that focus set
-- allocates to the move whose near-top ordering is most uncertain
-
-The core uncertainty score is built from terms like
-
-```text
-p_ij * (1 - p_ij)
-```
-
-where `p_ij` is the posterior probability that move `i` beats move `j`.
-
-This is largest when `p_ij` is near `0.5`, so the method spends budget on
-pairwise ambiguities near the top of the ranking.
-
-Key parameters:
-
-- `ranking_top_k`
-  Size of the near-top focus set.
-- `ranking_draws`
-  Number of posterior draws used to estimate ranking uncertainty.
-
-Why use it:
-
-- if the real goal is top-of-ranking recovery, not just one sampled winner,
-  then near-top pairwise uncertainty is often the right place to spend budget
-
-### `elimination_thompson`
-
-This variant is Thompson sampling plus screening.
-
-The package:
-
-- keeps a set of active actions
-- waits until every active action has at least `elimination_min_allocations`
-- computes approximate 95 percent posterior intervals
-- removes actions whose upper bound is clearly below the leader's lower bound,
-  up to a protection set of size `elimination_keep_top`
-
-The screening rule is approximately:
-
-```text
-eliminate action i if
-upper_95(i) + elimination_margin < max_j lower_95(j)
-```
-
-except that the top `elimination_keep_top` actions by posterior mean are always
-protected.
-
-Key parameters:
-
-- `elimination_min_allocations`
-- `elimination_keep_top`
-- `elimination_margin`
-
-Why use it:
-
-- to stop wasting budget on clearly inferior actions
-
-Risk:
-
-- if elimination happens too early, the method can remove a move that should
-  have survived
-
-### `budget_aware_thompson`
-
-This is a staged hybrid policy.
-
-The package uses budget progress
-
-```text
-progress = spent / total_budget
-```
-
-and then switches behavior by phase.
-
-Current logic:
-
-- early phase, `progress < 0.3`
-  - use a more exploratory multi-sample style rule with at least a few winner
-    draws and elevated temperature
-- middle phase
-  - behave like canonical Thompson
-- late phase, `progress >= 0.75`
-  - inspect the top gap and near-top uncertainty
-  - if the top gap is small relative to posterior uncertainty, use top-two
-    Thompson
-  - otherwise use ranking-aware allocation
-
-The near-tie trigger is approximately:
-
-```text
-top_gap <= 1.25 * gap_sd
-```
-
-where `gap_sd` is built from the posterior standard deviations of the leading
-actions.
-
-Why use it:
-
-- different phases of the budget path need different behavior
-- early budgets reward broad exploration
-- late budgets reward careful discrimination among near-best moves
-
-This is one of the most heuristic variants in the package.
-
-## Important Parameters For Important Functions
-
-This section focuses on the functions you will actually use most often.
-
-### `bg_problem()`
-
-Purpose:
-
-- build the canonical one-state, one-roll decision object
-
-Most important parameters:
-
-- `state`
-  A `bg_board` object.
-- `roll`
-  A `bg_roll` object.
-- `simulation_policy`
-  Continuation policy after the root action. This changes the estimand.
-- `heuristic_policy`
-  Only used when `simulation_policy = "heuristic"`.
-- `max_rollout_turns`
-  Rollout truncation horizon.
-- `unresolved_value`
-  Payoff assigned to unresolved rollouts.
-- `prior_alpha`, `prior_beta`
-  Pseudo-counts used by beta-style models.
-- `reward_model`
-  The rollout reward variable.
-- `posterior_model`
-  The posterior family used for Thompson-style summaries.
-- `posterior_prior`
-  Optional named prior override.
-- `legal_moves`
-  Optional precomputed legal move set.
-- `cache`
-  Reuse a cached problem object when possible.
-- `problem_id`
-  Stable label for studies and saved artifacts.
-
-What it returns:
-
-- a `bg_problem` object containing the board, roll, legal actions, model stack,
-  and rollout settings
-
-### `bg_reference()`
-
-Purpose:
-
-- build one high-budget proxy reference for one `bg_problem`
-
-Most important parameters:
-
-- `problem`
-  A `bg_problem`.
-- `budget`
-  Total proxy-reference rollout budget.
-- `workers_truth`
-  Worker count for truth computation.
-- `truth_block_size`
-  Block size for rollout chunks.
-- `reference_mode`
-  `"equal"` or `"focused"`.
-  `"equal"` is the main conservative mode.
-  `"focused"` is faster but approximate.
-- `extend_existing_reference`
-  Extend a previously built reference instead of starting from zero.
-- `dice_mode`
-  Dice-generation mode.
-- `crn`
-  Whether to use common random numbers.
-- `focus_top`
-  Number of actions protected into the focused second stage.
-- `focus_share`
-  Fraction of the total budget allocated to the focused stage.
-- `seed`
-  Reproducible random seed.
-
-What it returns:
-
-- a `bg_reference` object with action-level proxy means, MC intervals, and
-  rankings
-
-### `bg_truth_state()`
-
-Purpose:
-
-- build, save, load, or extend one cached proxy-truth object for one state-roll
-  problem
-
-Most important parameters:
-
-- `state`, `roll`
-  Used when you are not passing a prebuilt `problem`.
-- `problem`
-  Optional prebuilt `bg_problem`.
-- `budget`
-  Proxy-truth budget.
-- `simulation_policy`, `reward_model`, `posterior_model`
-  Only used when `problem` is not supplied.
-- `n_cores`, `parallel`
-  Worker control.
-- `truth_block_size`
-  Block size for rollout chunks.
-- `reference_mode`
-  `"equal"` or `"focused"`.
-- `cache`
-  Whether to reuse existing truth files automatically.
-- `cache_dir`
-  Directory used when `save_path` is omitted.
-- `save_path`
-  Explicit artifact path.
-- `overwrite`
-  Rebuild even if the file already exists.
-- `dice_mode`, `crn`, `seed`
-  Variance and RNG controls.
-- `problem_id`
-  Label used when building a new `bg_problem` internally.
-
-What it returns:
-
-- a `bg_truth_state` object containing the wrapped `bg_reference`, metadata, and
-  summary tables
-
-### `bg_truth_opening()`
-
-Purpose:
-
-- build a battery of cached opening-roll proxy truths
-
-Most important parameters:
-
-- `rolls`
-  Optional list of `bg_roll` objects. If omitted, the opening battery is used.
-- `include_doubles`
-  Whether the six doubles are included.
-- `budget`
-  Proxy-truth budget per roll.
-- `simulation_policy`, `reward_model`, `posterior_model`
-  Model stack for all opening problems.
-- `n_cores`, `parallel`
-  Worker control.
-- `reference_mode`
-  `"equal"` or `"focused"`.
-- `cache`, `cache_dir`, `save_path`, `overwrite`
-  File management.
-- `dice_mode`, `crn`, `seed`
-  Variance and RNG control.
-- `verbose`
-  Progress display.
-
-What it returns:
-
-- a `bg_truth_battery` object
-
-### `bg_truth_battery()`
-
-Purpose:
-
-- build proxy truths for a list of prebuilt problems
-
-Most important parameters:
-
-- `problems`
-  One `bg_problem` or a list of them.
-- `budget`
-  Per-problem truth budget.
-- `n_cores`, `parallel`, `truth_block_size`
-  Compute controls.
-- `reference_mode`
-  `"equal"` or `"focused"`.
-- `cache`, `cache_dir`, `save_path`, `overwrite`
-  Persistence controls.
-- `dice_mode`, `crn`, `seed`
-  Variance controls.
-- `verbose`
-  Progress display.
-
-### `bg_ts_run()`
-
-Purpose:
-
-- run canonical Thompson sampling on one problem
-
-Direct parameters:
-
-- `problem`
-- `budget`
-- `proxy_reference`
-- `checkpoints`
-- `seed`
-
-Additional important controls passed through `...`:
-
-- `ts_mode`
-  `"sequential"` or `"batched"`. Batched mode is limited.
-- `dice_mode`
-  `"iid"`, `"stratified_first_roll"`, or `"stratified_first_two_rolls"`.
-- `crn`
-  Common random numbers.
-- `task_block_size`
-  Block size for rollout blocks.
-
-What it returns:
-
-- a `bg_ts_run` object with a final action table and a checkpoint table
-
-### `bg_ttts_run()`
-
-Purpose:
-
-- run top-two Thompson sampling on one problem
-
-Direct parameters:
-
-- `problem`
-- `budget`
-- `proxy_reference`
-- `checkpoints`
-- `seed`
-- `ttts_beta`
-
-`ttts_beta` interpretation:
-
-- probability of staying with the current Thompson winner rather than the
-  challenger
-
-### `bg_uniform_run()` and `bg_ucb_run()`
-
-Purpose:
-
-- run the main non-Thompson baselines
-
-Use these when:
-
-- you want a simple equal-allocation benchmark
-- you want a confidence-bound benchmark
-
-Current caveat:
-
-- non-Thompson comparators remain tied to the legacy scalar fast path, so they
-  are mainly intended for `scalar_payoff + beta_pseudo` problems
-
-### `bg_compare_algorithms()`
-
-Purpose:
-
-- compare methods across problems, budgets, and seeds
-
-Most important parameters:
-
-- `problems`
-  One `bg_problem` or a list of them.
-- `methods`
-  Character vector such as
-  `c("thompson", "top_two_thompson", "ucb", "equal")`.
-- `budgets`
-  Budget grid.
-- `seeds`
-  Repeated-seed set.
-- `proxy_references`
-  Optional supplied truth objects.
-- `reference_budget`
-  Budget used to build references if `proxy_references` is omitted.
-- `save_path`
-  Optional study artifact path.
-- `overwrite`
-  Whether existing artifacts may be replaced.
-- `n_cores`, `parallel`
-  Study-level parallel controls.
-- `progress`
-  Progress display.
-- `...`
-  Passed into the underlying comparison engine.
-
-What it returns:
-
-- a `bg_method_compare` object
-
-### `bg_compare_posteriors()`
-
-Purpose:
-
-- keep the reward model fixed and compare posterior families
-
-Most important parameters:
-
-- `problems`
-- `posterior_models`
-  If omitted, the package uses the recommended posterior families for the chosen
-  reward model.
-- `reward_model`
-  Fixed reward model for the comparison.
-- `budgets`
-- `seeds`
-- `allocation_policy`
-  Usually `"thompson"` or `"top_two_thompson"`.
-- `proxy_references`
-- `reference_budget`
-- `n_cores`, `parallel`, `progress`
-- `save_path`, `overwrite`
-
-What it returns:
-
-- a `bg_posterior_compare` object
-
-### `bg_compare_reward_models()`
-
-Purpose:
-
-- compare coherent reward-model/posterior-model stacks
-
-Most important parameters:
-
-- `problems`
-- `reward_model_map`
-  Named vector mapping each reward model to its posterior model.
-- `budgets`
-- `seeds`
-- `allocation_policy`
-- `win_loss_unresolved_value`
-  Special unresolved value when comparing the `win_loss` stack.
-- `reference_budget`
-- `n_cores`, `parallel`, `progress`
-- `save_path`, `overwrite`
-
-What it returns:
-
-- a `bg_reward_model_compare` object
-
-## Evaluation Metrics
-
-The package distinguishes:
-
-- rollout-model values
-- proxy-reference values
-- posterior summaries from finite-budget runs
-- runtime summaries
-
-### Decision-quality metrics
-
-- `top1_match`
-
-```text
-1{selected move = proxy-truth best move}
-```
-
-- `simple_regret`
-
-```text
-mu_ref(best) - mu_ref(selected)
-```
-
-- `epsilon_optimal`
-
-```text
-1{simple_regret <= epsilon}
-```
-
-- `selected_reference_rank`
-
-```text
-proxy-truth rank of the selected move
-```
-
-- `recommended_prob_best`
-
-```text
-posterior probability that the recommended move is best
-```
-
-- `posterior_top_k_mass`
-
-```text
-posterior mass carried by the top-k estimated moves
-```
-
-### Ranking metrics
-
-- `spearman`
-  Spearman rank correlation between estimated and proxy-truth rankings.
-- `kendall`
-  Kendall rank correlation between estimated and proxy-truth rankings.
-- `top_k_overlap`
-
-```text
-|Top_k_estimated intersect Top_k_truth| / k
-```
-
-- `top_k_overlap_n`
-
-```text
-|Top_k_estimated intersect Top_k_truth|
-```
-
-- `pairwise_ordering_accuracy`
-
-```text
-proportion of move pairs ordered the same way by estimate and proxy truth
-```
-
-- `pairwise_disagreement_count`
-
-```text
-number of move pairs ordered differently
-```
-
-- `weighted_rank_loss`
-
-```text
-sum_i w_i * |rank_hat_i - rank_truth_i| / sum_i w_i
-with w_i = 1 / rank_truth_i
-```
-
-### Allocation metrics
-
-If `p_i` is the budget share allocated to move `i`, then:
-
-- `allocation_entropy`
-
-```text
-- sum_i p_i log(p_i) / log(K)
-```
-
-- `allocation_hhi`
-
-```text
-sum_i p_i^2
-```
-
-- `allocation_max_share`
-
-```text
-max_i p_i
-```
-
-- `share_top_k_truth`
-
-```text
-sum_{i in Top_k_truth} p_i
-```
-
-- `share_best_truth`
-
-```text
-p_(truth-best)
-```
-
-- `share_mc_screened_suboptimal`
-
-```text
-budget share spent on moves screened as clearly suboptimal by proxy-reference
-MC intervals or the fallback gap rule
-```
-
-- `mc_screened_suboptimal_count`
-  Number of screened suboptimal moves.
-
-- `total_allocation`
-  Total rollouts allocated through the checkpoint.
-
-- `n_allocated_actions`
-  Number of actions that have received at least one rollout.
-
-### MC-screening and gap-aware metrics
-
-- `top_two_gap_estimate`
-
-```text
-mu_ref(best) - mu_ref(second_best)
-```
-
-- `near_tie`
-  Whether the top-two proxy-reference gap is smaller than the chosen tolerance.
-
-- `mc_not_separated_from_best_set_size`
-
-```text
-number of moves whose proxy-reference upper interval still overlaps the best
-move's lower interval
-```
-
-- `chosen_mc_not_separated_from_best`
-  Whether the selected move lies in that non-separated set.
-
-- `chosen_gap_to_best`
-
-```text
-mu_ref(best) - mu_ref(selected)
-```
-
-### Efficiency metrics
-
-These summarize how quickly a method becomes good.
-
-- `first_budget_top1_match`
-  First checkpoint where the method recommends the proxy-truth best move.
-- `first_budget_epsilon_optimal`
-  First checkpoint where regret falls below the epsilon target.
-- `first_runtime_top1_match`
-  First runtime where top-1 correctness is achieved.
-- `first_runtime_epsilon_optimal`
-  First runtime where epsilon-optimality is achieved.
-- `auc_top1_match`
-  Area under the budget-path curve for top-1 correctness.
-- `auc_simple_regret`
-  Area under the budget-path curve for simple regret.
-
-### Calibration metrics
-
-These ask whether posterior confidence is trustworthy.
-
-- `brier_top1`
-
-```text
-(recommended_prob_best - top1_outcome)^2
-```
-
-- calibration-bin summaries:
-  - `mean_predicted_prob_best`
-  - `observed_top1_rate`
-  - `calibration_gap`
-  - `ece_component`
-
-Interpretation:
-
-- if predicted probability-best is well calibrated, `mean_predicted_prob_best`
-  should track `observed_top1_rate`
-
-### Runtime summaries
-
-- `runtime_seconds`
-- `rollout_throughput`
-
-## Public API By Group
-
-### Board, roll, move, and simulation functions
-
-- `bg_board()`
-- `bg_initial_board()`
-- `bg_roll()`
-- `bg_legal_moves()`
-- `bg_apply_move_sequence()`
-- `bg_play_turn()`
-- `bg_play_game()`
-- `bg_print_board()`
-- `bg_validate_board()`
-
-### Problem and truth functions
-
-- `bg_problem()`
-- `bg_reference()`
-- `bg_truth_state()`
-- `bg_truth_opening()`
-- `bg_truth_battery()`
-- `bg_truth_save()`
-- `bg_truth_load()`
-- `bg_truth_diagnostics()`
-- `bg_study_save()`
-- `bg_study_load()`
-
-### Methods
+### Central
 
 - `bg_ts_run()`
 - `bg_ttts_run()`
-- `bg_uniform_run()`
-- `bg_ucb_run()`
-- `bg_compare_algorithms()`
-- `bg_compare_posteriors()`
-- `bg_compare_reward_models()`
+- `bg_equal_run()`
 
-### Evaluation
+### Supported TS-family variants
+
+- `bg_multi_sample_ts_run()`
+- `bg_soft_elimination_ts_run()`
+- `bg_forced_exploration_ts_run()`
+- `bg_top_k_ts_run()`
+
+### Legacy / secondary
+
+- `bg_uniform_run()` as a deprecated alias to `bg_equal_run()`
+- `bg_ucb_run()` as a legacy comparator
+
+The package intentionally does not center a large baseline zoo.
+
+## Diagnostics and metrics
+
+The main evaluation helpers are:
 
 - `bg_eval_top1()`
+- `bg_eval_topk()`
 - `bg_eval_rank()`
+- `bg_eval_restricted_rank()`
 - `bg_eval_allocation()`
 - `bg_eval_efficiency()`
 - `bg_eval_calibration()`
 - `bg_eval_reference_aware()`
+- `bg_ts_diagnostics()`
 
-### State and feature functions
+These answer questions like:
 
-- `bg_board_features()`
-- `bg_move_features()`
-- `bg_state_classify()`
-- `bg_state_difficulty()`
+- Did the run select the truth-best move?
+- What was the truth rank of the selected move?
+- Was the selected move in the truth top 2 or top k?
+- How much simple regret remained?
+- How much budget was wasted on clearly inferior moves?
+- How stable was the final recommendation across seeds?
 
-### Plot functions
+## Truth certification and stability
 
-- `plot_bg_truth()`
-- `plot_bg_ts_trace()`
-- `plot_bg_allocation()`
-- `plot_bg_budget_curve()`
-- `plot_bg_rank_compare()`
-- `plot_bg_posterior_compare()`
+The package tries not to overclaim Monte Carlo proxy truth.
 
-## Current Notebooks
+### `bg_truth_certify()`
 
-The current notebook sequence is:
+This summarizes whether a proxy truth looks separated enough to support
+comparisons. It focuses on:
 
-1. `01_save_all_21_opening_truths`
-2. `02_roll_1_6_thompson_over_budget`
-3. `03_roll_1_6_thompson_vs_non_thompson`
-4. `04_roll_1_6_thompson_variants`
-5. `05_roll_1_6_thompson_model_comparison`
-6. `06_roll_1_6_mc_screening_efficiency_and_calibration`
+- the estimated top-two gap
+- the Monte Carlo interval around that gap
+- whether the interval excludes zero
+- near-optimal set size
+- not-separated-from-best set size
+- screening labels such as `clear`, `hard`, `ambiguous`, or `uncertain`
 
-These notebooks are meant to be run directly and edited directly.
+### `bg_truth_stability()`
 
-## Installation And Development
+This asks a different question:
 
-Install from a local checkout:
+- if the truth build is repeated over budgets and seeds, does the reference
+  stabilize?
+
+That matters because a method comparison is only as trustworthy as the truth
+object it is being scored against.
+
+## Analysis entrypoints
+
+The repository's main human-facing path is `analysis/`.
+
+### Main walkthrough
+
+- [`analysis/00_walkthrough_and_results.R`](analysis/00_walkthrough_and_results.R)
+
+This file is intentionally long and heavily commented. It is the best place to
+start if you want:
+
+- a tour of the package
+- actual results
+- saved tables and plots
+- use of the preserved opening cache
+
+### Focused analysis scripts
+
+- [`analysis/01_opening_truth_overview.R`](analysis/01_opening_truth_overview.R)
+- [`analysis/02_ts_vs_ttts_opening_study.R`](analysis/02_ts_vs_ttts_opening_study.R)
+- [`analysis/03_build_reward_truth_caches.R`](analysis/03_build_reward_truth_caches.R)
+
+All generated outputs are written under:
+
+- `analysis/output/`
+
+## Cache directories
+
+### Preserved repo cache
+
+- [`cache/opening_truths_restart/`](cache/opening_truths_restart)
+
+This directory contains the preserved 21-opening proxy truths at budget
+`1,000,000` and should be kept intact.
+
+### New master-truth workflow
+
+Typical new cache directories are:
+
+- `cache/opening_truths_master/`
+- `cache/opening_truths_scalar_payoff/`
+- `cache/opening_truths_win_loss/`
+- `cache/opening_truths_categorical/`
+
+The package's master-truth workflow is designed so that:
+
+1. one expensive master simulation is run once
+2. later reward-system-specific truth objects are projected from it
+
+### Loading and projection example
 
 ```r
-install.packages(".", repos = NULL, type = "source")
 library(backgammonr)
+
+master_truth <- bg_opening_master_truth_build_one(
+  roll = "1-6",
+  budget = 1000000L,
+  n_cores = 4L,
+  parallel = TRUE,
+  truth_block_size = 512L,
+  cache = TRUE,
+  cache_dir = "cache/opening_truths_master",
+  seed = 1L
+)
+
+truth_scalar <- bg_truth_project(
+  master_truth,
+  reward_model = "scalar_payoff",
+  posterior_model = "student_t_marginal",
+  unresolved_value = 0.5
+)
 ```
 
-For development:
+## Performance notes
+
+Large truth builds are slow because the work is genuinely large.
+
+The truth builder does call compiled C++ rollout code. The runtime is not
+mostly R overhead.
+
+When a truth build is slow, the main reasons are:
+
+- large rollout budget
+- many candidate states
+- long continuation games
+- large `max_rollout_turns`
+- equal-allocation reference mode spending budget across every candidate
+
+### What `truth_block_size` means
+
+`truth_block_size` is a chunk size for the rollout-block engine.
+
+It is:
+
+- a computational tuning parameter
+
+It is not:
+
+- a scientific tuning parameter
+
+Changing it may affect overhead modestly, but it does not change the estimand.
+
+### Practical runtime guidance
+
+If you want to stay productive:
+
+1. build all 21 openings at `250000` or `500000` first
+2. inspect certification
+3. extend only the hard openings to `1000000` or `2000000`
+
+Truth builds extend cached objects cleanly when the problem identity matches and
+the new requested budget is larger.
+
+## Repository map
+
+The easiest reading order is:
+
+1. [`analysis/00_walkthrough_and_results.R`](analysis/00_walkthrough_and_results.R)
+2. [`R/bg_problem.R`](R/bg_problem.R)
+3. [`R/bg_truth.R`](R/bg_truth.R)
+4. [`R/bg_algorithms.R`](R/bg_algorithms.R)
+5. [`R/bg_metrics.R`](R/bg_metrics.R)
+6. [`src/truth_proxy.cpp`](src/truth_proxy.cpp)
+7. [`src/alloc_core.cpp`](src/alloc_core.cpp)
+8. [`src/policy_ts.cpp`](src/policy_ts.cpp)
+9. [`src/policy_ttts.cpp`](src/policy_ttts.cpp)
+
+If you want the engine only, start with:
+
+1. [`R/bg_engine_api.R`](R/bg_engine_api.R)
+2. [`src/bg_board.cpp`](src/bg_board.cpp)
+3. [`src/bg_movegen.cpp`](src/bg_movegen.cpp)
+4. [`src/bg_rules.cpp`](src/bg_rules.cpp)
+5. [`src/bg_game.cpp`](src/bg_game.cpp)
+6. [`src/engine_playout.cpp`](src/engine_playout.cpp)
+
+## Reproducibility
+
+For reproducible work:
+
+- set explicit `seed` values
+- save truth objects to cache
+- keep reward system and unresolved handling explicit
+- keep rollout continuation policy explicit
+- record the truth cache directory used by each study
+
+The package supports reproducible saved objects through:
+
+- `bg_truth_save()`
+- `bg_truth_load()`
+- `bg_study_save()`
+- `bg_study_load()`
+
+## Minimal example
+
+This is the shortest research-facing example that reflects the cleaned package
+design.
 
 ```r
-pkgload::load_all(".")
+library(backgammonr)
+
+master_truth <- bg_opening_master_truth_build_one(
+  roll = "1-6",
+  budget = 1000000L,
+  n_cores = 4L,
+  parallel = TRUE,
+  truth_block_size = 512L,
+  cache = TRUE,
+  cache_dir = "cache/opening_truths_master",
+  seed = 1L
+)
+
+truth_scalar <- bg_truth_project(
+  master_truth,
+  reward_model = "scalar_payoff",
+  posterior_model = "student_t_marginal",
+  unresolved_value = 0.5
+)
+
+fit_ts <- bg_ts_run(
+  problem = truth_scalar$problem,
+  budget = 128L,
+  checkpoints = c(32L, 64L, 128L),
+  proxy_reference = truth_scalar$reference,
+  seed = 1L
+)
+
+diag_ts <- bg_ts_diagnostics(fit_ts, truth = truth_scalar)
+diag_ts$accuracy
+diag_ts$allocation
 ```
 
-## Final Scientific Frame
+That is the package in one workflow:
 
-`backgammonr` is a package about finite-budget simulation allocation with
-backgammon as a realistic stochastic laboratory.
-
-Its core scientific distinctions are:
-
-- rollout-model value versus unavailable game-theoretic truth
-- high-budget proxy reference versus finite-budget algorithm output
-- posterior uncertainty versus proxy-reference Monte Carlo uncertainty
-- decision quality versus runtime cost
-
-That is the package story.
+- simulate one high-budget truth
+- project it into the reward system you want
+- run a lower-budget Thompson method
+- score it against the fixed truth

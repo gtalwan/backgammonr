@@ -35,11 +35,6 @@ LinkingTo:
     RcppArmadillo,
     RcppParallel
 Suggests:
-    knitr,
-    pkgdown,
-    rmarkdown,
     testthat (>= 3.0.0)
-VignetteBuilder:
-    knitr
 Config/testthat/edition: 3
 SystemRequirements: C++17

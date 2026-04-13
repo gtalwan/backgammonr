@@ -54,18 +54,23 @@ comparison.
 Recommended entry points for the public interface are:
 \itemize{
 \item \code{bg_problem()} to define one state-plus-roll decision problem;
-\item \code{bg_reference()}, \code{bg_truth_state()}, and \code{bg_truth_opening()} to build
-or reuse proxy references;
+\item \code{bg_reference()}, \code{bg_truth_state()}, and the \verb{bg_opening_*()} helpers to
+build or reuse proxy references for the 21 opening rolls;
 \item \code{bg_study_save()} / \code{bg_study_load()} to keep expensive study objects
 reusable;
 \item \code{bg_ts_run()} and \code{bg_ttts_run()} for the main TS analysis loop;
-\item \code{bg_reference()} to construct or extend a high-budget proxy reference;
-\item \code{bg_ucb_run()} to expose an optimism-based scalar-engine comparator;
-\item \code{bg_compare_algorithms()} to compare Thompson to TTTS, UCB, and baseline
-allocation rules, with scalar-engine comparators restricted to
-\code{scalar_payoff + beta_pseudo} problems in the current rescue pass;
-\item \code{bg_eval_reference_aware()} and \code{plot_bg_budget_curve()} to summarize
-finite-budget performance;
+\item \code{bg_equal_run()} for the main non-TS baseline;
+\item \code{bg_multi_sample_ts_run()}, \code{bg_soft_elimination_ts_run()},
+\code{bg_forced_exploration_ts_run()}, and \code{bg_top_k_ts_run()} for the
+supported TS-family variants;
+\item \code{bg_truth_certify()} to screen whether a proxy truth is separated enough
+to support strong comparative claims;
+\item \code{bg_sanity_lab()} to sanity-check TS and TTTS on small non-backgammon
+cases with known truth;
+\item \code{bg_compare_algorithms()} to compare Thompson, TTTS, and equal allocation,
+with legacy scalar comparators available only when requested;
+\item \code{bg_ts_diagnostics()}, \code{bg_eval_reference_aware()}, and
+\code{plot_bg_budget_curve()} to summarize finite-budget performance;
 \item \code{bg_compare_posteriors()} and \code{bg_compare_reward_models()} for the
 compact model-comparison workflows.
 }
@@ -73,6 +78,10 @@ compact model-comparison workflows.
 Legacy helpers remain in the source tree for compatibility and internal
 reuse, but they are no longer part of the package narrative. The intended
 workflow runs through the curated \verb{bg_*} interface.
+
+For repo-local orientation and real example outputs, start with the analysis
+scripts under \verb{analysis/}, especially
+\verb{analysis/00_walkthrough_and_results.R}.
 
 Core loops use \code{Rcpp}, \code{RcppArmadillo}, and \code{RcppParallel} to keep canonical
 sequential Thompson semantics intact while accelerating proxy-reference

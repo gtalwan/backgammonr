@@ -6,7 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "bg_allocation.h"
+#include "alloc_interface.h"
 #include "bg_heuristic.h"
 #include "bg_movegen.h"
 #include "bg_random_player.h"

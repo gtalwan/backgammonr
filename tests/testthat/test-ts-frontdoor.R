@@ -39,7 +39,7 @@ test_that("core public workflow builds coherent problem, truth, and TS objects",
   )
   ttts <- bg_ttts_run(problem, budget = 32L, proxy_reference = truth$reference, seed = 11L)
   ucb <- bg_ucb_run(problem, budget = 32L, checkpoints = c(8L, 16L, 32L), proxy_reference = truth$reference, seed = 11L)
-  equal <- bg_uniform_run(problem, budget = 32L, checkpoints = c(8L, 16L, 32L), proxy_reference = truth$reference, seed = 11L)
+  equal <- bg_equal_run(problem, budget = 32L, checkpoints = c(8L, 16L, 32L), proxy_reference = truth$reference, seed = 11L)
 
   expect_s3_class(fit1, "bg_ts_run")
   expect_s3_class(ttts, "bg_ts_run")

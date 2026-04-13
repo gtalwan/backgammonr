@@ -21,8 +21,12 @@ src/*.dylib
 vignettes/*.html
 vignettes/*.pdf
 tests/testthat/Rplots.pdf
+cache/
+analysis/output/
 figure/
+vignettes/artifacts/
 vignettes/_example_outputs/
+artifacts/pilot/
 artifacts/**/*.rds
 artifacts/**/*.csv
 artifacts/**/*.png
