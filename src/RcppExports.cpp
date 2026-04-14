@@ -679,6 +679,102 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// bg_cpp_posterior_equal_choice
+int bg_cpp_posterior_equal_choice(const Rcpp::IntegerVector& active_idx, const int spent);
+RcppExport SEXP _backgammonr_bg_cpp_posterior_equal_choice(SEXP active_idxSEXP, SEXP spentSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type active_idx(active_idxSEXP);
+    Rcpp::traits::input_parameter< const int >::type spent(spentSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_posterior_equal_choice(active_idx, spent));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_posterior_thompson_choice
+int bg_cpp_posterior_thompson_choice(const Rcpp::NumericMatrix& draw_mat, const Rcpp::NumericVector& allocation_count, const Rcpp::NumericVector& posterior_mean);
+RcppExport SEXP _backgammonr_bg_cpp_posterior_thompson_choice(SEXP draw_matSEXP, SEXP allocation_countSEXP, SEXP posterior_meanSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type draw_mat(draw_matSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type allocation_count(allocation_countSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type posterior_mean(posterior_meanSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_posterior_thompson_choice(draw_mat, allocation_count, posterior_mean));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_posterior_top_two_choice
+int bg_cpp_posterior_top_two_choice(const Rcpp::NumericMatrix& draw_mat, const Rcpp::NumericVector& allocation_count, const double ttts_beta);
+RcppExport SEXP _backgammonr_bg_cpp_posterior_top_two_choice(SEXP draw_matSEXP, SEXP allocation_countSEXP, SEXP ttts_betaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type draw_mat(draw_matSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type allocation_count(allocation_countSEXP);
+    Rcpp::traits::input_parameter< const double >::type ttts_beta(ttts_betaSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_posterior_top_two_choice(draw_mat, allocation_count, ttts_beta));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_posterior_multi_sample_choice
+int bg_cpp_posterior_multi_sample_choice(const Rcpp::NumericMatrix& draw_mat, const Rcpp::NumericVector& allocation_count, const Rcpp::NumericVector& posterior_mean);
+RcppExport SEXP _backgammonr_bg_cpp_posterior_multi_sample_choice(SEXP draw_matSEXP, SEXP allocation_countSEXP, SEXP posterior_meanSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type draw_mat(draw_matSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type allocation_count(allocation_countSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type posterior_mean(posterior_meanSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_posterior_multi_sample_choice(draw_mat, allocation_count, posterior_mean));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_posterior_forced_choice
+int bg_cpp_posterior_forced_choice(const Rcpp::NumericVector& allocation_count, const int spent, const int forced_every, const int forced_min_allocations);
+RcppExport SEXP _backgammonr_bg_cpp_posterior_forced_choice(SEXP allocation_countSEXP, SEXP spentSEXP, SEXP forced_everySEXP, SEXP forced_min_allocationsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type allocation_count(allocation_countSEXP);
+    Rcpp::traits::input_parameter< const int >::type spent(spentSEXP);
+    Rcpp::traits::input_parameter< const int >::type forced_every(forced_everySEXP);
+    Rcpp::traits::input_parameter< const int >::type forced_min_allocations(forced_min_allocationsSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_posterior_forced_choice(allocation_count, spent, forced_every, forced_min_allocations));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_posterior_update_active_set
+Rcpp::LogicalVector bg_cpp_posterior_update_active_set(const Rcpp::LogicalVector& active, const Rcpp::NumericVector& posterior_mean, const Rcpp::NumericVector& posterior_sd, const Rcpp::NumericVector& allocation_count, const int min_allocations, const int keep_top, const double margin);
+RcppExport SEXP _backgammonr_bg_cpp_posterior_update_active_set(SEXP activeSEXP, SEXP posterior_meanSEXP, SEXP posterior_sdSEXP, SEXP allocation_countSEXP, SEXP min_allocationsSEXP, SEXP keep_topSEXP, SEXP marginSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::LogicalVector& >::type active(activeSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type posterior_mean(posterior_meanSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type posterior_sd(posterior_sdSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type allocation_count(allocation_countSEXP);
+    Rcpp::traits::input_parameter< const int >::type min_allocations(min_allocationsSEXP);
+    Rcpp::traits::input_parameter< const int >::type keep_top(keep_topSEXP);
+    Rcpp::traits::input_parameter< const double >::type margin(marginSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_posterior_update_active_set(active, posterior_mean, posterior_sd, allocation_count, min_allocations, keep_top, margin));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bg_cpp_posterior_top_k_choice
+int bg_cpp_posterior_top_k_choice(const Rcpp::NumericMatrix& draw_mat, const Rcpp::NumericVector& posterior_mean, const Rcpp::NumericVector& allocation_count, const int focus_top_k);
+RcppExport SEXP _backgammonr_bg_cpp_posterior_top_k_choice(SEXP draw_matSEXP, SEXP posterior_meanSEXP, SEXP allocation_countSEXP, SEXP focus_top_kSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type draw_mat(draw_matSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type posterior_mean(posterior_meanSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type allocation_count(allocation_countSEXP);
+    Rcpp::traits::input_parameter< const int >::type focus_top_k(focus_top_kSEXP);
+    rcpp_result_gen = Rcpp::wrap(bg_cpp_posterior_top_k_choice(draw_mat, posterior_mean, allocation_count, focus_top_k));
+    return rcpp_result_gen;
+END_RCPP
+}
 // bg_cpp_posterior_sample_values
 Rcpp::NumericMatrix bg_cpp_posterior_sample_values(const Rcpp::IntegerVector& allocation_count, const Rcpp::IntegerVector& wins, const Rcpp::IntegerVector& losses, const Rcpp::IntegerVector& single_loss, const Rcpp::IntegerVector& gammon_loss, const Rcpp::IntegerVector& backgammon_loss, const Rcpp::IntegerVector& unresolved, const Rcpp::IntegerVector& single_win, const Rcpp::IntegerVector& gammon_win, const Rcpp::IntegerVector& backgammon_win, const Rcpp::NumericVector& reward_sum, const Rcpp::NumericVector& reward_sum_sq, const std::string& reward_model, const std::string& posterior_model, const double unresolved_value, const Rcpp::List& posterior_prior, const int draws);
 RcppExport SEXP _backgammonr_bg_cpp_posterior_sample_values(SEXP allocation_countSEXP, SEXP winsSEXP, SEXP lossesSEXP, SEXP single_lossSEXP, SEXP gammon_lossSEXP, SEXP backgammon_lossSEXP, SEXP unresolvedSEXP, SEXP single_winSEXP, SEXP gammon_winSEXP, SEXP backgammon_winSEXP, SEXP reward_sumSEXP, SEXP reward_sum_sqSEXP, SEXP reward_modelSEXP, SEXP posterior_modelSEXP, SEXP unresolved_valueSEXP, SEXP posterior_priorSEXP, SEXP drawsSEXP) {
@@ -844,6 +940,13 @@ static const R_CallMethodDef CallEntries[] = {
     {"_backgammonr_bg_cpp_allocation_evaluate", (DL_FUNC) &_backgammonr_bg_cpp_allocation_evaluate, 16},
     {"_backgammonr_bg_cpp_allocation_evaluate_trace", (DL_FUNC) &_backgammonr_bg_cpp_allocation_evaluate_trace, 17},
     {"_backgammonr_bg_cpp_profile_rollout_runtime", (DL_FUNC) &_backgammonr_bg_cpp_profile_rollout_runtime, 10},
+    {"_backgammonr_bg_cpp_posterior_equal_choice", (DL_FUNC) &_backgammonr_bg_cpp_posterior_equal_choice, 2},
+    {"_backgammonr_bg_cpp_posterior_thompson_choice", (DL_FUNC) &_backgammonr_bg_cpp_posterior_thompson_choice, 3},
+    {"_backgammonr_bg_cpp_posterior_top_two_choice", (DL_FUNC) &_backgammonr_bg_cpp_posterior_top_two_choice, 3},
+    {"_backgammonr_bg_cpp_posterior_multi_sample_choice", (DL_FUNC) &_backgammonr_bg_cpp_posterior_multi_sample_choice, 3},
+    {"_backgammonr_bg_cpp_posterior_forced_choice", (DL_FUNC) &_backgammonr_bg_cpp_posterior_forced_choice, 4},
+    {"_backgammonr_bg_cpp_posterior_update_active_set", (DL_FUNC) &_backgammonr_bg_cpp_posterior_update_active_set, 7},
+    {"_backgammonr_bg_cpp_posterior_top_k_choice", (DL_FUNC) &_backgammonr_bg_cpp_posterior_top_k_choice, 4},
     {"_backgammonr_bg_cpp_posterior_sample_values", (DL_FUNC) &_backgammonr_bg_cpp_posterior_sample_values, 17},
     {"_backgammonr_bg_cpp_posterior_summary", (DL_FUNC) &_backgammonr_bg_cpp_posterior_summary, 17},
     {"_backgammonr_bg_cpp_reference_summary", (DL_FUNC) &_backgammonr_bg_cpp_reference_summary, 6},

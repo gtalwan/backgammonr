@@ -1,5 +1,12 @@
 // Scalar-payoff approximate posterior kernels.
 //
+// Purpose:
+// - translate bounded scalar rollout summaries into approximate posterior draws
+//   over the mean reward;
+// - share one conjugate normal-inverse-gamma update between the
+//   `normal_inverse_gamma` and `student_t_marginal` routes; and
+// - expose a lighter Gaussian plug-in path for faster approximate studies.
+//
 // Reward variable:
 // - bounded scalar rollout payoff on [0, 1].
 //
@@ -11,6 +18,11 @@
 // - `normal_inverse_gamma` and `student_t_marginal` share one conjugate update
 //   for a normal mean with unknown variance, then differ in how they sample or
 //   summarize the mean.
+//
+// Interpretation:
+// The package does not claim a scalar payoff is literally Gaussian. These
+// models are pragmatic posterior approximations for local decision studies on a
+// bounded reward scale.
 
 #include "posterior_core.h"
 

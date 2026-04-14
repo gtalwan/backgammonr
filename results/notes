@@ -1,0 +1,77 @@
+fit_ts <- bg_ts_run(
+  problem = truth$problem,
+  budget = budget,
+  checkpoints = checkpoints,
+  proxy_reference = truth$reference,
+  seed = 1L
+)
+
+
+fit_ttts <- bg_ttts_run(
+  problem = truth$problem,
+  budget = budget,
+  checkpoints = checkpoints,
+  proxy_reference = truth$reference,
+  seed = 1L,
+  ttts_beta = 0.6
+)
+
+
+
+fit_multi <- bg_multi_sample_ts_run(
+  problem = truth$problem,
+  budget = budget,
+  checkpoints = checkpoints,
+  proxy_reference = truth$reference,
+  seed = 1L,
+  multi_sample_draws = 7L
+)
+
+
+
+fit_soft <- bg_soft_elimination_ts_run(
+  problem = truth$problem,
+  budget = budget,
+  checkpoints = checkpoints,
+  proxy_reference = truth$reference,
+  seed = 1L,
+  elimination_min_allocations = 4L,
+  elimination_keep_top = 2L,
+  elimination_margin = 0.01
+)
+
+
+
+
+fit_forced <- bg_forced_exploration_ts_run(
+  problem = truth$problem,
+  budget = budget,
+  checkpoints = checkpoints,
+  proxy_reference = truth$reference,
+  seed = 1L,
+  forced_every = 5L,
+  forced_min_allocations = 2L
+)
+
+
+fit_topk <- bg_top_k_ts_run(
+  problem = truth$problem,
+  budget = budget,
+  checkpoints = checkpoints,
+  proxy_reference = truth$reference,
+  seed = 1L,
+  top_k = 4L,
+  ranking_draws = 96L
+)
+
+
+
+fit_equal <- bg_equal_run(
+  problem = truth$problem,
+  budget = budget,
+  checkpoints = checkpoints,
+  proxy_reference = truth$reference,
+  seed = 1L
+)
+
+

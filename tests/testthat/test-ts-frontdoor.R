@@ -158,6 +158,50 @@ test_that("compare-algorithms save_path reuses existing study objects", {
   expect_equal(cmp1$summary, cmp2$summary)
 })
 
+test_that("equal allocation works on explicit win/loss posterior stacks", {
+  problem <- bg_problem(
+    state = bg_initial_board(),
+    roll = bg_roll(1L, 6L),
+    reward_model = "win_loss",
+    posterior_model = "beta_bernoulli",
+    unresolved_value = 0,
+    cache = FALSE
+  )
+
+  truth <- bg_truth_state(
+    problem = problem,
+    budget = 64L,
+    n_cores = 1L,
+    parallel = FALSE,
+    cache = FALSE,
+    seed = 17L
+  )
+
+  equal <- bg_equal_run(
+    problem = problem,
+    budget = 32L,
+    checkpoints = c(8L, 16L, 32L),
+    proxy_reference = truth$reference,
+    seed = 17L
+  )
+
+  cmp <- bg_compare_algorithms(
+    problems = problem,
+    methods = c("thompson", "equal"),
+    budgets = c(8L, 16L),
+    seeds = 1:2,
+    proxy_references = truth$reference,
+    progress = FALSE
+  )
+
+  expect_s3_class(equal, "bg_ts_run")
+  expect_identical(equal$allocation_policy, "equal")
+  expect_identical(equal$settings$engine_path, "explicit_posterior_engine")
+  expect_equal(sum(equal$action_table$allocation_count), 32)
+  expect_s3_class(cmp, "bg_method_compare")
+  expect_true(all(c("thompson", "equal") %in% cmp$summary$method))
+})
+
 test_that("trimmed public namespace does not export internal study helpers", {
   exports <- getNamespaceExports("backgammonr")
 

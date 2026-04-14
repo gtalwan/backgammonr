@@ -1,5 +1,11 @@
 // Beta-family posterior kernels.
 //
+// Purpose:
+// - provide the exact Beta-Bernoulli update used for binary win/loss studies;
+// - provide the pseudo-Beta approximation used by the scalar legacy stack; and
+// - keep the sufficient-stat reduction shared between posterior sampling and
+//   posterior summary output.
+//
 // Reward variable:
 // - `beta_bernoulli`: binary win/loss reward, with unresolved outcomes folded
 //   in as fractional success/failure mass on [0, 1].
@@ -12,6 +18,11 @@
 // Status:
 // - `beta_bernoulli` is exact conjugate for the binary reward model.
 // - `beta_pseudo` is an approximation for bounded scalar payoffs.
+//
+// Output contract:
+// - `sample_beta_family_value()` returns one posterior draw of the mean reward;
+// - `summarize_beta_family()` returns analytic posterior moments and a 95%
+//   equal-tail interval for plotting and diagnostics.
 
 #include "posterior_core.h"
 

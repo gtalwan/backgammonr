@@ -1,5 +1,12 @@
 // Dirichlet-multinomial posterior kernels.
 //
+// Purpose:
+// - provide the exact conjugate posterior for multi-category rollout outcomes;
+// - support both the collapsed three-category path and the full seven-category
+//   scored-outcome path; and
+// - project categorical posterior uncertainty back onto one scalar reward scale
+//   through an explicit payoff map.
+//
 // Reward variable:
 // - categorical scored rollout outcome, either 3 collapsed categories
 //   (loss/unresolved/win) or the full 7-category score class.
@@ -9,6 +16,12 @@
 //
 // Status:
 // - exact conjugate for the categorical outcome model.
+//
+// Output contract:
+// - `sample_dirichlet_value()` returns one scalar reward draw implied by a
+//   Dirichlet draw over the outcome simplex;
+// - `summarize_dirichlet_family()` returns posterior mean and posterior SD for
+//   that same scalar reward functional.
 
 #include "posterior_core.h"
 

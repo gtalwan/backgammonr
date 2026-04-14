@@ -1,4 +1,14 @@
 // Allocation trace snapshots and export helpers.
+//
+// The trace layer exists for one reason: the package wants readable,
+// checkpoint-by-checkpoint pictures of what the allocator is doing without
+// duplicating the rollout loop. The core engine simulates and updates; this
+// file only:
+// - asks the core to refresh posterior/empirical summaries at a checkpoint;
+// - records which candidate was just sampled and which candidate currently
+//   leads; and
+// - converts the compact native trace rows into the data-frame schema used by
+//   the R plotting and diagnostics layer.
 
 #include "alloc_trace.h"
 
@@ -8,6 +18,9 @@ namespace backgammonr {
 namespace allocation {
 
 int current_leader_index(const std::vector<ActionEvaluationSummary>& summaries) {
+  // "Leader" means the action with the largest current posterior mean
+  // estimate, with deterministic tie-breaking toward the more-sampled action.
+  // This is not the same thing as the last sampled action.
   if (summaries.empty()) {
     return NA_INTEGER;
   }
@@ -35,6 +48,8 @@ void append_trace_snapshot(
     const RolloutConfig& config,
     const int checkpoint,
     const int selected_candidate) {
+  // Always refresh the shared summary fields first so the trace row reflects
+  // the allocator state *after* the newly completed rollout has been absorbed.
   refresh_summary_fields(summaries, policy, config, checkpoint);
   const int leader_pos = current_leader_index(summaries);
   const int leader_index = leader_pos == NA_INTEGER
@@ -42,6 +57,8 @@ void append_trace_snapshot(
       : summaries[leader_pos].candidate_index;
 
   for (const ActionEvaluationSummary& summary : summaries) {
+    // Emit one row per candidate so the R side can later reconstruct
+    // candidate-by-checkpoint panels without needing any more native logic.
     AllocationTraceRow row;
     row.checkpoint = checkpoint;
     row.selected_candidate = selected_candidate;
@@ -65,6 +82,9 @@ void append_trace_snapshot(
 
 Rcpp::DataFrame allocation_trace_rows_to_data_frame(
     const std::vector<AllocationTraceRow>& trace_rows) {
+  // The trace export is intentionally column-oriented because the R layer uses
+  // the result directly for tidy plots, checkpoint tables, and seed-level
+  // diagnostics.
   const int n = static_cast<int>(trace_rows.size());
   Rcpp::IntegerVector checkpoint(n);
   Rcpp::IntegerVector selected_candidate(n);

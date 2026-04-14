@@ -227,12 +227,12 @@ bg_compare_methods <- function(
   bg_assert_scalar_flag(progress, "progress")
   bg_assert_scalar_flag(overwrite, "overwrite")
 
-  scalar_engine_methods <- methods[!vapply(methods, bg_is_thompson_policy_public, logical(1L))]
+  legacy_scalar_methods <- methods[vapply(methods, bg_policy_requires_legacy_scalar_engine, logical(1L))]
   incompatible_scalar <- vapply(problems, function(problem) !bg_problem_supports_legacy_scalar_engine(problem), logical(1L))
-  if (length(scalar_engine_methods) > 0L && any(incompatible_scalar)) {
+  if (length(legacy_scalar_methods) > 0L && any(incompatible_scalar)) {
     stop(
       "Scalar-engine comparators (",
-      paste(unique(scalar_engine_methods), collapse = ", "),
+      paste(unique(legacy_scalar_methods), collapse = ", "),
       ") are currently available only for `scalar_payoff + beta_pseudo` problems. ",
       "Use Thompson-family methods on richer model stacks, or rebuild the problem on the legacy scalar stack before comparing against scalar-engine baselines.",
       call. = FALSE
@@ -266,6 +266,29 @@ bg_compare_methods <- function(
     stringsAsFactors = FALSE
   )
   tasks <- split(task_grid, seq_len(nrow(task_grid)))
+  planned_runs <- nrow(task_grid)
+  max_budget <- max(budgets)
+  planned_rollouts <- planned_runs * max_budget
+
+  if (isTRUE(progress)) {
+    message(
+      sprintf(
+        paste(
+          "Study design: %d problem%s x %d method%s x %d seed%s = %d runs.",
+          "Each run goes to budget %d, for a total planned rollout budget of %d."
+        ),
+        length(problems),
+        if (length(problems) == 1L) "" else "s",
+        length(methods),
+        if (length(methods) == 1L) "" else "s",
+        length(seeds),
+        if (length(seeds) == 1L) "" else "s",
+        planned_runs,
+        max_budget,
+        planned_rollouts
+      )
+    )
+  }
 
   task_runs <- bg_task_apply(
     tasks = tasks,
@@ -279,28 +302,15 @@ bg_compare_methods <- function(
       seed <- task$seed[[1L]]
       problem <- problems[[p_idx]]
       reference <- proxy_references[[p_idx]]
-
-      run <- if (bg_is_thompson_policy_public(method)) {
-        bg_ts_decide(
-          problem = problem,
-          budget = max(budgets),
-          allocation_policy = method,
-          proxy_reference = reference,
-          checkpoints = budgets,
-          seed = seed,
-          ...
-        )
-      } else {
-        bg_run_method_path(
-          problem = problem,
-          allocation_policy = method,
-          budget = max(budgets),
-          checkpoints = budgets,
-          reference = reference,
-          seed = seed,
-          ...
-        )
-      }
+      run <- bg_run_allocation_method(
+        problem = problem,
+        allocation_policy = method,
+        budget = max_budget,
+        checkpoints = budgets,
+        proxy_reference = reference,
+        seed = seed,
+        ...
+      )
 
       run_id <- paste(problem$problem_id, method, seed, sep = "::")
       df <- run$checkpoint_table
@@ -354,7 +364,13 @@ bg_compare_methods <- function(
         budgets = budgets,
         seeds = seeds,
         n_cores = n_cores,
-        parallel = isTRUE(parallel)
+        parallel = isTRUE(parallel),
+        n_problems = length(problems),
+        n_methods = length(methods),
+        n_seeds = length(seeds),
+        n_runs = planned_runs,
+        max_budget = max_budget,
+        total_rollout_budget = planned_rollouts
       )
     ),
     class = "bg_method_compare"

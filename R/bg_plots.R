@@ -14,30 +14,37 @@ bg_plot_theme_research <- function() {
       panel.background = ggplot2::element_rect(fill = "#fbfaf7", color = NA),
       plot.title.position = "plot",
       legend.position = "bottom",
+      legend.box = "vertical",
+      legend.margin = ggplot2::margin(t = 4, r = 0, b = 0, l = 0),
+      legend.box.margin = ggplot2::margin(t = 2, r = 0, b = 0, l = 0),
+      panel.spacing = grid::unit(0.9, "lines"),
       strip.text = ggplot2::element_text(face = "bold"),
       strip.background = ggplot2::element_rect(fill = "#eef3f7", color = "#d9e1e8"),
       plot.title = ggplot2::element_text(face = "bold", size = 16),
       plot.subtitle = ggplot2::element_text(color = "#405261", margin = ggplot2::margin(b = 8)),
       axis.title = ggplot2::element_text(face = "bold"),
+      axis.title.x = ggplot2::element_text(margin = ggplot2::margin(t = 8)),
+      axis.title.y = ggplot2::element_text(margin = ggplot2::margin(r = 8)),
       axis.text = ggplot2::element_text(color = "#24323d"),
-      legend.title = ggplot2::element_text(face = "bold")
+      legend.title = ggplot2::element_text(face = "bold"),
+      plot.margin = ggplot2::margin(t = 12, r = 16, b = 10, l = 10)
     )
 }
 
 bg_method_palette <- function() {
   c(
-    thompson = "#0b4f6c",
-    top_two_thompson = "#c9643b",
-    multi_sample_thompson = "#3c6997",
-    soft_elimination_thompson = "#bc6c25",
-    forced_exploration_thompson = "#7a8b2e",
-    top_k_thompson = "#6d597a",
-    equal = "#7c8b5a",
-    ucb = "#8f5d9f",
-    ocba = "#d1a63c",
-    greedy = "#5c6b73",
-    elimination_thompson = "#bc6c25",
-    ranking_aware_thompson = "#6d597a"
+    thompson = "#0072B2",
+    top_two_thompson = "#D55E00",
+    multi_sample_thompson = "#009E73",
+    soft_elimination_thompson = "#CC79A7",
+    forced_exploration_thompson = "#E69F00",
+    top_k_thompson = "#56B4E9",
+    equal = "#6C757D",
+    ucb = "#332288",
+    ocba = "#AA4499",
+    greedy = "#999933",
+    elimination_thompson = "#CC79A7",
+    ranking_aware_thompson = "#56B4E9"
   )
 }
 
@@ -59,9 +66,14 @@ bg_metric_label <- function(metric) {
     metric,
     simple_regret = "Simple regret",
     top1_match = "Top-1 match rate",
+    selected_reference_rank = "Truth rank of selected move",
+    truth_top2_hit = "Selected move is in truth top-2",
     spearman = "Spearman rank correlation",
     top_k_overlap = "Top-k overlap",
     share_top_k_truth = "Budget share on truth top-k",
+    share_top2_truth = "Budget share on truth top-2",
+    share_mc_screened_suboptimal = "Budget share on MC-screened suboptimal moves",
+    gap_weighted_wasted_allocation = "Gap-weighted wasted allocation",
     allocation = "Allocation count",
     prob_best = "Posterior probability-best",
     estimate = "Posterior mean estimate",
@@ -72,6 +84,35 @@ bg_metric_label <- function(metric) {
     runtime_seconds = "Runtime (seconds)",
     elapsed_seconds = "Elapsed time (seconds)",
     metric
+  )
+}
+
+bg_plot_method_order <- function() {
+  c(
+    "thompson",
+    "top_two_thompson",
+    "multi_sample_thompson",
+    "soft_elimination_thompson",
+    "forced_exploration_thompson",
+    "top_k_thompson",
+    "equal",
+    "ucb",
+    "ocba",
+    "greedy"
+  )
+}
+
+bg_plot_method_spec <- function(methods) {
+  methods <- unique(as.character(methods))
+  ordered_methods <- c(
+    intersect(bg_plot_method_order(), methods),
+    setdiff(methods, bg_plot_method_order())
+  )
+  labels <- vapply(ordered_methods, bg_allocation_policy_label, character(1L))
+  list(
+    methods = ordered_methods,
+    labels = labels,
+    palette = stats::setNames(bg_lookup_palette_values(ordered_methods), labels)
   )
 }
 
@@ -144,9 +185,24 @@ plot_bg_truth <- function(x, top_n = 8L) {
     df$label <- df[[label_col]]
     df <- df[order(df$top_two_gap_estimate), , drop = FALSE]
     df$label <- factor(df$label, levels = df$label)
+    has_gap_interval <- all(c("top_two_gap_mc_lower_95", "top_two_gap_mc_upper_95") %in% names(df))
 
     return(
       ggplot2::ggplot(df, ggplot2::aes(x = top_two_gap_estimate, y = label, color = mc_gap_excludes_zero)) +
+        if (has_gap_interval) {
+          ggplot2::geom_segment(
+            ggplot2::aes(
+              x = top_two_gap_mc_lower_95,
+              xend = top_two_gap_mc_upper_95,
+              y = label,
+              yend = label
+            ),
+            linewidth = 1.4,
+            alpha = 0.45
+          )
+        } else {
+          ggplot2::geom_blank()
+        } +
         ggplot2::geom_segment(
           ggplot2::aes(x = 0, xend = top_two_gap_estimate, y = label, yend = label),
           linewidth = 0.8
@@ -154,7 +210,11 @@ plot_bg_truth <- function(x, top_n = 8L) {
         ggplot2::geom_point(ggplot2::aes(size = n_moves), alpha = 0.9) +
         ggplot2::scale_color_manual(values = c(`TRUE` = "#0b4f6c", `FALSE` = "#c9643b")) +
         ggplot2::labs(
-          title = "Proxy-truth separation across states",
+          title = if (identical(label_col, "opening_roll")) {
+            "Opening truth gap ladder"
+          } else {
+            "Proxy-truth separation across states"
+          },
           subtitle = "Each point is the estimated gap between the best and second-best move under the rollout model.",
           x = "Estimated top-two gap",
           y = NULL,
@@ -254,7 +314,18 @@ plot_bg_ucb_trace <- function(x, metric = c("allocation", "estimate", "selection
 #' @export
 plot_bg_budget_curve <- function(
     x,
-    metric = c("simple_regret", "top1_match", "spearman", "top_k_overlap", "share_top_k_truth"),
+    metric = c(
+      "simple_regret",
+      "top1_match",
+      "selected_reference_rank",
+      "truth_top2_hit",
+      "spearman",
+      "top_k_overlap",
+      "share_top_k_truth",
+      "share_top2_truth",
+      "share_mc_screened_suboptimal",
+      "gap_weighted_wasted_allocation"
+    ),
     truth = NULL,
     checkpoints = NULL,
     top_k = 3L) {
@@ -264,26 +335,40 @@ plot_bg_budget_curve <- function(
     metric,
     simple_regret = bg_eval_top1(x, truth = truth, checkpoints = checkpoints),
     top1_match = bg_eval_top1(x, truth = truth, checkpoints = checkpoints),
+    selected_reference_rank = bg_eval_reference_aware(x, truth = truth, checkpoints = checkpoints, top_k = top_k),
+    truth_top2_hit = bg_eval_reference_aware(x, truth = truth, checkpoints = checkpoints, top_k = top_k),
     spearman = bg_eval_rank(x, truth = truth, checkpoints = checkpoints, top_k = top_k),
     top_k_overlap = bg_eval_rank(x, truth = truth, checkpoints = checkpoints, top_k = top_k),
-    share_top_k_truth = bg_eval_allocation(x, truth = truth, checkpoints = checkpoints, top_k = top_k)
+    share_top_k_truth = bg_eval_allocation(x, truth = truth, checkpoints = checkpoints, top_k = top_k),
+    share_top2_truth = bg_eval_allocation(x, truth = truth, checkpoints = checkpoints, top_k = top_k),
+    share_mc_screened_suboptimal = bg_eval_allocation(x, truth = truth, checkpoints = checkpoints, top_k = top_k),
+    gap_weighted_wasted_allocation = bg_eval_allocation(x, truth = truth, checkpoints = checkpoints, top_k = top_k)
   )
 
   value_col <- switch(
     metric,
     simple_regret = "simple_regret",
     top1_match = "top1_match",
+    selected_reference_rank = "selected_reference_rank",
+    truth_top2_hit = "truth_top2_hit",
     spearman = "spearman",
     top_k_overlap = "top_k_overlap",
-    share_top_k_truth = "share_top_k_truth"
+    share_top_k_truth = "share_top_k_truth",
+    share_top2_truth = "share_top2_truth",
+    share_mc_screened_suboptimal = "share_mc_screened_suboptimal",
+    gap_weighted_wasted_allocation = "gap_weighted_wasted_allocation"
   )
 
   summary_df <- bg_plot_curve_summary(raw, value_col = value_col)
-  palette_vals <- bg_lookup_palette_values(unique(summary_df$allocation_policy))
+  method_spec <- bg_plot_method_spec(summary_df$allocation_policy)
+  summary_df$method_label <- factor(
+    vapply(summary_df$allocation_policy, bg_allocation_policy_label, character(1L)),
+    levels = method_spec$labels
+  )
 
   p <- ggplot2::ggplot(
     summary_df,
-    ggplot2::aes(x = checkpoint, y = mean_value, color = allocation_policy, fill = allocation_policy)
+    ggplot2::aes(x = checkpoint, y = mean_value, color = method_label, fill = method_label)
   ) +
     ggplot2::geom_ribbon(
       ggplot2::aes(ymin = mean_value - sd_value, ymax = mean_value + sd_value),
@@ -293,8 +378,8 @@ plot_bg_budget_curve <- function(
     ) +
     ggplot2::geom_line(linewidth = 1) +
     ggplot2::geom_point(size = 2) +
-    ggplot2::scale_color_manual(values = palette_vals) +
-    ggplot2::scale_fill_manual(values = palette_vals) +
+    ggplot2::scale_color_manual(values = method_spec$palette, drop = FALSE) +
+    ggplot2::scale_fill_manual(values = method_spec$palette, drop = FALSE) +
     ggplot2::labs(
       title = "Budget-performance curve",
       subtitle = "Lines show mean performance across seeds; ribbons show one standard deviation where available.",
@@ -302,10 +387,11 @@ plot_bg_budget_curve <- function(
       y = bg_metric_label(metric),
       color = "Method"
     ) +
+    ggplot2::guides(color = ggplot2::guide_legend(nrow = 2, byrow = TRUE)) +
     bg_plot_theme_research()
 
   if (length(unique(summary_df$problem_id)) > 1L) {
-    p <- p + ggplot2::facet_wrap(~ problem_id, scales = "free_y")
+    p <- p + ggplot2::facet_wrap(~ problem_id, scales = "free_y", ncol = min(3L, length(unique(summary_df$problem_id))))
   }
 
   p

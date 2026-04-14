@@ -68,9 +68,9 @@
 #' reuse, but they are no longer part of the package narrative. The intended
 #' workflow runs through the curated `bg_*` interface.
 #'
-#' For repo-local orientation and real example outputs, start with the analysis
-#' scripts under `analysis/`, especially
-#' `analysis/00_walkthrough_and_results.R`.
+#' For repo-local orientation and real example outputs, start with the
+#' numbered walkthrough scripts under `Presentation/`, especially
+#' `Presentation/00_start_here.R`.
 #'
 #' Core loops use `Rcpp`, `RcppArmadillo`, and `RcppParallel` to keep canonical
 #' sequential Thompson semantics intact while accelerating proxy-reference

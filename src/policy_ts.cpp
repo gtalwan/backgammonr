@@ -1,10 +1,25 @@
 // Thompson-sampling allocation policy.
 //
-// Canonical one-draw Thompson sampling for the scalar/Beta engine. Every
-// action receives one posterior draw and the arm with the largest draw gets
-// the next rollout.
+// Purpose:
+// - implement the canonical one-draw Thompson selection rule for the fast
+//   scalar/Beta allocation engine;
+// - keep the policy logic separate from rollout execution, trace capture, and
+//   summary updates, all of which live in alloc_core.cpp; and
+// - provide the baseline selection rule against which TTTS and the other
+//   Thompson-family variants are interpreted.
+//
+// Statistical meaning:
+// - each candidate arm carries a Beta posterior over its scalar reward mean;
+// - one posterior draw is taken per arm;
+// - the arm with the largest draw gets the next rollout.
+//
+// Routing note:
+// This file is only used by the fast scalar/Beta engine. Richer posterior
+// families such as Student-t and Dirichlet route through the explicit
+// posterior R path and therefore never call this selector directly.
 
 #include "alloc_core.h"
+#include "posterior_policy.h"
 
 #include <limits>
 
@@ -50,4 +65,31 @@ int choose_thompson_candidate(
 }
 
 }  // namespace allocation
+
+namespace posterior_policy {
+
+int choose_posterior_thompson_candidate(
+    const Rcpp::NumericMatrix& draw_mat,
+    const Rcpp::NumericVector& allocation_count,
+    const Rcpp::NumericVector& posterior_mean) {
+  // Explicit-posterior canonical TS uses the first row of `draw_mat` as one
+  // jointly sampled posterior world over the active actions. The surrounding
+  // R engine is responsible for ensuring that this matrix contains at least
+  // one draw row and that the first row is the one intended for selection.
+  if (draw_mat.ncol() < 1) {
+    Rcpp::stop("Canonical TS cannot choose from an empty candidate set.");
+  }
+  if (draw_mat.ncol() != allocation_count.size() ||
+      draw_mat.ncol() != posterior_mean.size()) {
+    Rcpp::stop("Canonical TS requires draw, count, and mean vectors to align.");
+  }
+
+  // Feed that sampled world into the shared selector. The helper chooses the
+  // largest sampled value, breaks ties toward the least-sampled action, and
+  // then falls back to posterior mean if a deterministic final tie-break is
+  // still needed.
+  return posterior_pick_index(matrix_row(draw_mat, 0), allocation_count, posterior_mean);
+}
+
+}  // namespace posterior_policy
 }  // namespace backgammonr

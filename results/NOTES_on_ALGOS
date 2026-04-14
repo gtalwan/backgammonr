@@ -1,0 +1,186 @@
+THOMPSON SAMPLING
+
+For each step:
+  For each move a:
+    draw one sampled value theta_a from the posterior of move a
+
+  choose the move with the largest sampled value
+
+  run one rollout on that move
+  update that move’s posterior statistics
+
+
+For every move, imagine one plausible value.
+Pick the move that looks best in that imagined world.
+
+Strong moves win often.
+Uncertain moves sometimes win.
+So the method naturally balances exploration and exploitation.
+
+
+TOP-TWO THOMPSON SAMPLING
+
+For each step:
+  First find a Thompson winner:
+    for each move a:
+      draw theta_a from the posterior
+    top1 = move with largest theta_a
+
+  with probability beta:
+    choose top1
+  otherwise:
+    repeatedly redraw until a different winner appears:
+      for each move a:
+        draw theta'_a from the posterior
+      top2 = move with largest theta'_a
+    choose top2
+
+  run one rollout on the chosen move
+  update that move’s posterior statistics
+
+
+Ordinary TS often keeps rewarding the current winner.
+TTTS forces more attention onto the competition between the leader and the challenger.
+
+It is trying to answer:
+"Is the current best move really better than the next-best contender?"
+
+
+
+
+MULTI-SAMPLE THOMPSON SAMPLING
+
+For each step:
+  For each move a:
+    draw M posterior samples
+    average them to get score_a
+
+  choose the move with the largest average score
+
+  run one rollout on that move
+  update that move’s posterior statistics
+
+
+Instead of trusting one random posterior draw, take several and average them.
+
+This makes the method less jumpy than ordinary Thompson sampling.
+It is a smoother version of TS.
+
+
+
+SOFT-ELIMINATION THOMPSON SAMPLING
+
+Start with all moves active.
+
+For each step:
+  compute posterior mean and posterior sd for each active move
+
+  if every active move has enough samples:
+    for each active move a:
+      lower_a = mean_a - 1.96 * sd_a
+      upper_a = mean_a + 1.96 * sd_a
+
+    leader_lower = largest lower_a among active moves
+
+    keep the top few active moves protected
+
+    for each non-protected active move:
+      if upper_a + margin < leader_lower:
+        eliminate that move from the active set
+
+  among the remaining active moves:
+    for each active move a:
+      draw theta_a from the posterior
+
+    choose the move with the largest theta_a
+
+  run one rollout on that move
+  update that move’s posterior statistics
+
+
+
+
+This method tries to stop wasting budget on clearly weak moves.
+
+But it does not prune aggressively right away.
+It waits until every move has enough evidence, then removes only moves whose upper bound looks clearly worse than the leader.
+
+So it is Thompson sampling plus cautious screening.
+
+
+Move A: mean = 0.60, sd = 0.02   -> interval about [0.56, 0.64]
+Move B: mean = 0.58, sd = 0.02   -> interval about [0.54, 0.62]
+Move C: mean = 0.43, sd = 0.03   -> interval about [0.37, 0.49]
+Move D: mean = 0.41, sd = 0.02   -> interval about [0.37, 0.45]
+
+
+
+FORCED-EXPLORATION THOMPSON SAMPLING
+
+For each step:
+  if some move has too few samples:
+    choose the least-sampled move
+
+  else if this step is a forced-exploration checkpoint:
+    choose the least-sampled move
+
+  else:
+    for each move a:
+      draw theta_a from the posterior
+    choose the move with the largest theta_a
+
+  run one rollout on that move
+  update that move’s posterior statistics
+
+
+Most of the time this behaves like ordinary Thompson sampling.
+
+But every so often it overrides Thompson and says:
+"Stop. Go sample the neglected move."
+
+This protects the method from getting too confident too early.
+
+
+
+TOP-K THOMPSON SAMPLING
+
+For each step:
+  compute posterior mean for each move
+  define the current top-k set F = the k moves with highest posterior mean
+
+  for each move i in F:
+    set uncertainty_i = 0
+    for each other move j in F:
+      estimate p_ij = probability that i beats j using posterior draws
+      add p_ij * (1 - p_ij) to uncertainty_i
+
+  choose the move in F with the largest total uncertainty
+
+  run one rollout on that move
+  update that move’s posterior statistics
+
+
+
+This method first narrows attention to the current top-k moves.
+
+Then it asks:
+"Inside this shortlist, which move is involved in the most unresolved ranking uncertainty?"
+
+So it is not mainly a best-single-move method.
+It is more of a shortlist-refinement method.
+
+
+EQUAL ALLOCATION
+
+For each step:
+  choose the next move in round-robin order
+
+  run one rollout on that move
+  update that move’s data
+
+
+
+This method ignores the posterior entirely.
+
+It gives every move roughly the same amount of simulation budget.
+It is the neutral baseline.

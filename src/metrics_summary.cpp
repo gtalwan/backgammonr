@@ -14,6 +14,13 @@
 // Outputs:
 // - one consistent R-facing summary schema across posterior families; and
 // - compact path-level and calibration summaries used by diagnostics/studies.
+//
+// Design rule:
+// The code below is intentionally split into three stages:
+// 1. sample or receive posterior draw matrices;
+// 2. convert those draws into comparable action-level summaries;
+// 3. return data frames that the R layer can plot without model-specific
+//    branching.
 
 #include "posterior_core.h"
 
@@ -77,6 +84,9 @@ double sample_posterior_value(
     const std::string& posterior_model,
     const double unresolved_value,
     const Rcpp::List& prior) {
+  // This router is the single native switchboard for explicit posterior draws.
+  // Each model-specific file owns its own update/sample logic; the metrics
+  // layer only decides which sampler to call.
   if (posterior_model == "beta_bernoulli" || posterior_model == "beta_pseudo") {
     return sample_beta_family_value(stats, posterior_model, unresolved_value, prior);
   }

@@ -293,458 +293,6 @@ bg_temper_draw_matrix <- function(draw_mat, posterior_mean, temperature = 1) {
 
 # TTTS is implemented as repeated posterior-winner draws until a distinct
 # challenger appears, with a deterministic fallback if repeated draws tie.
-bg_posterior_top_two_choice <- function(draw_mat, allocation_count, ttts_beta = 0.5) {
-  winner_once <- function() {
-    bg_posterior_pick_index(
-      scores = draw_mat[sample.int(nrow(draw_mat), 1L), ],
-      allocation_count = allocation_count
-    )
-  }
-
-  top1 <- winner_once()
-  if (ncol(draw_mat) == 1L) {
-    return(top1)
-  }
-
-  if (!is.numeric(ttts_beta) || length(ttts_beta) != 1L || is.na(ttts_beta) || ttts_beta <= 0 || ttts_beta > 1) {
-    ttts_beta <- 0.5
-  }
-  if (stats::runif(1L) <= ttts_beta) {
-    return(top1)
-  }
-
-  for (attempt in seq_len(64L)) {
-    top2 <- winner_once()
-    if (!identical(top2, top1)) {
-      return(top2)
-    }
-  }
-
-  posterior_mean <- colMeans(draw_mat)
-  posterior_mean[top1] <- -Inf
-  bg_posterior_pick_index(
-    scores = posterior_mean,
-    allocation_count = allocation_count,
-    tie_break = posterior_mean
-  )
-}
-
-# Ranking-aware TS focuses on uncertainty inside the near-top set instead of
-# only the current leader.
-bg_posterior_ranking_choice <- function(draw_mat, posterior_mean, allocation_count, focus_top_k = 3L) {
-  focus_top_k <- bg_coerce_integerish(focus_top_k, "focus_top_k", 1L)
-  if (ncol(draw_mat) <= 1L) {
-    return(1L)
-  }
-
-  focus_local <- order(posterior_mean, decreasing = TRUE)[seq_len(min(focus_top_k, length(posterior_mean)))]
-  if (length(focus_local) <= 1L) {
-    return(focus_local[[1L]])
-  }
-
-  uncertainty <- numeric(length(posterior_mean))
-  for (i in focus_local) {
-    pair_uncertainty <- numeric(0L)
-    for (j in focus_local) {
-      if (identical(i, j)) {
-        next
-      }
-      p_ij <- mean(draw_mat[, i] > draw_mat[, j])
-      pair_uncertainty <- c(pair_uncertainty, p_ij * (1 - p_ij))
-    }
-    uncertainty[[i]] <- sum(pair_uncertainty)
-  }
-
-  bg_posterior_pick_index(
-    scores = uncertainty,
-    allocation_count = allocation_count,
-    tie_break = posterior_mean
-  )
-}
-
-# Elimination only screens once every action has at least a minimum amount of
-# evidence, and it always protects a small leader set from removal.
-bg_posterior_update_active_set <- function(
-    active,
-    posterior_mean,
-    posterior_sd,
-    allocation_count,
-    min_allocations = 4L,
-    keep_top = 2L,
-    margin = 0) {
-  min_allocations <- bg_coerce_integerish(min_allocations, "min_allocations", 1L)
-  keep_top <- bg_coerce_integerish(keep_top, "keep_top", 1L)
-  if (!is.numeric(margin) || length(margin) != 1L || is.na(margin) || margin < 0) {
-    stop("`margin` must be a nonnegative numeric scalar.", call. = FALSE)
-  }
-
-  active_idx <- which(active)
-  if (length(active_idx) <= keep_top || any(allocation_count[active_idx] < min_allocations)) {
-    return(active)
-  }
-
-  lower_95 <- pmax(posterior_mean - 1.96 * posterior_sd, 0)
-  upper_95 <- pmin(posterior_mean + 1.96 * posterior_sd, 1)
-  leader_lower <- max(lower_95[active_idx], na.rm = TRUE)
-  keep_idx <- active_idx[order(posterior_mean[active_idx], decreasing = TRUE)][seq_len(min(keep_top, length(active_idx)))]
-  eliminated <- setdiff(active_idx[upper_95[active_idx] + margin < leader_lower], keep_idx)
-  if (length(eliminated) > 0L) {
-    active[eliminated] <- FALSE
-  }
-  active
-}
-
-# Different TS variants need different draw budgets. Keep that rule centralized
-# so the sequential TS loop can stay simple.
-bg_posterior_selection_draws <- function(
-    allocation_policy,
-    spent,
-    budget,
-    multi_sample_draws,
-    ranking_draws) {
-  switch(
-    allocation_policy,
-    thompson = 1L,
-    multi_sample_thompson = max(2L, multi_sample_draws),
-    soft_elimination_thompson = max(64L, ranking_draws),
-    top_two_thompson = max(64L, ranking_draws),
-    forced_exploration_thompson = 1L,
-    top_k_thompson = max(64L, ranking_draws),
-    max(64L, ranking_draws)
-  )
-}
-
-# Convert one posterior draw matrix into one selected candidate under the chosen
-# TS-family policy. This is the main policy switch for the explicit engine.
-bg_posterior_select_candidate <- function(
-    allocation_policy,
-    draw_mat,
-    posterior_mean,
-    posterior_sd,
-    allocation_count,
-    spent,
-    budget,
-    active,
-    multi_sample_draws = 5L,
-    temperature = 1.25,
-    ttts_beta = 0.5,
-    ranking_top_k = 3L,
-    forced_every = 8L,
-    forced_min_allocations = 2L) {
-  allocation_policy <- bg_match_allocation_policy_public(allocation_policy)
-  active_idx <- which(active)
-  if (length(active_idx) < 1L) {
-    stop("No active actions remain.", call. = FALSE)
-  }
-  if (length(active_idx) == 1L) {
-    return(active_idx[[1L]])
-  }
-
-  local_draws <- draw_mat[, active_idx, drop = FALSE]
-  local_mean <- posterior_mean[active_idx]
-  local_sd <- posterior_sd[active_idx]
-  local_count <- allocation_count[active_idx]
-
-  if (identical(allocation_policy, "forced_exploration_thompson")) {
-    forced_every <- bg_coerce_integerish(forced_every, "forced_every", 1L)
-    forced_min_allocations <- bg_coerce_integerish(forced_min_allocations, "forced_min_allocations", 1L)
-
-    if (any(local_count < forced_min_allocations) ||
-        ((spent + 1L) %% max(1L, forced_every) == 0L)) {
-      return(active_idx[[which.min(local_count)]])
-    }
-  }
-
-  local_choice <- switch(
-    allocation_policy,
-    thompson = {
-      bg_posterior_pick_index(local_draws[1L, ], local_count, tie_break = local_mean)
-    },
-    multi_sample_thompson = {
-      bg_posterior_pick_index(colMeans(local_draws), local_count, tie_break = local_mean)
-    },
-    top_two_thompson = {
-      bg_posterior_top_two_choice(local_draws, local_count, ttts_beta = ttts_beta)
-    },
-    forced_exploration_thompson = {
-      bg_posterior_pick_index(local_draws[1L, ], local_count, tie_break = local_mean)
-    },
-    top_k_thompson = {
-      bg_posterior_ranking_choice(
-        draw_mat = local_draws,
-        posterior_mean = local_mean,
-        allocation_count = local_count,
-        focus_top_k = ranking_top_k
-      )
-    },
-    soft_elimination_thompson = {
-      bg_posterior_pick_index(local_draws[1L, ], local_count, tie_break = local_mean)
-    },
-    stop("Unsupported posterior Thompson variant.", call. = FALSE)
-  )
-
-  active_idx[[local_choice]]
-}
-
-bg_run_posterior_ts <- function(
-    problem,
-    allocation_policy,
-    budget,
-    checkpoints,
-    reference = NULL,
-    seed = NULL,
-    task_block_size = 1L,
-    dice_mode = c("iid", "stratified_first_roll", "stratified_first_two_rolls"),
-    crn = FALSE,
-    multi_sample_draws = 5L,
-    temperature = 1.25,
-    ranking_top_k = 3L,
-    ranking_draws = 128L,
-    elimination_min_allocations = 4L,
-    elimination_keep_top = 2L,
-    elimination_margin = 0,
-    forced_every = 8L,
-    forced_min_allocations = 2L,
-    ttts_beta = 0.5,
-    prob_best_draws = 256L) {
-  allocation_policy <- bg_match_allocation_policy_public(allocation_policy)
-  dice_mode <- match.arg(dice_mode)
-  task_block_size <- bg_coerce_integerish(task_block_size, "task_block_size", 1L)
-  multi_sample_draws <- bg_coerce_integerish(multi_sample_draws, "multi_sample_draws", 1L)
-  ranking_top_k <- bg_coerce_integerish(ranking_top_k, "ranking_top_k", 1L)
-  ranking_draws <- bg_coerce_integerish(ranking_draws, "ranking_draws", 1L)
-  prob_best_draws <- bg_coerce_integerish(prob_best_draws, "prob_best_draws", 1L)
-
-  candidate_table <- problem$candidate_table[order(problem$candidate_table$candidate_index), , drop = FALSE]
-  if (nrow(candidate_table) == 0L) {
-    return(bg_empty_ts_run(
-      problem = problem,
-      allocation_policy = allocation_policy,
-      budget = budget,
-      checkpoints = checkpoints,
-      reference = reference,
-      legacy_evaluation = NULL,
-      settings = list(
-        budget = budget,
-        checkpoints = checkpoints,
-        seed = seed,
-        task_block_size = task_block_size,
-        dice_mode = dice_mode,
-        crn = isTRUE(crn),
-        reward_model = problem$settings$reward_model,
-        posterior_model = problem$settings$posterior_model,
-        engine_path = "explicit_posterior_engine"
-      ),
-      ts_mode = "sequential",
-      warnings = character(0L)
-    ))
-  }
-
-  stats_table <- bg_stats_table_template(candidate_table$candidate_index)
-  active <- rep(TRUE, nrow(stats_table))
-  eliminated_at <- rep(NA_integer_, nrow(stats_table))
-  checkpoint_rows <- vector("list", length(checkpoints))
-  checkpoint_actions <- vector("list", length(checkpoints))
-  spent <- 0L
-  runtime_start <- proc.time()[[3L]]
-
-  bg_ts_with_seed(seed, {
-    for (ck_idx in seq_along(checkpoints)) {
-      checkpoint_target <- checkpoints[[ck_idx]]
-      while (spent < checkpoint_target) {
-        selection_draws <- bg_posterior_selection_draws(
-          allocation_policy = allocation_policy,
-          spent = spent,
-          budget = budget,
-          multi_sample_draws = multi_sample_draws,
-          ranking_draws = ranking_draws
-        )
-        draw_mat <- bg_posterior_draw_matrix(
-          problem = problem,
-          stats_table = stats_table,
-          draws = selection_draws,
-          seed = bg_derive_seed(
-            seed,
-            "posterior-select",
-            problem$settings$reward_model_canonical,
-            problem$settings$posterior_model_canonical,
-            allocation_policy,
-            spent + 1L
-          )
-        )
-        draw_summary <- bg_draw_matrix_summary(draw_mat)
-
-        if (identical(allocation_policy, "soft_elimination_thompson")) {
-          updated <- bg_posterior_update_active_set(
-            active = active,
-            posterior_mean = draw_summary$mean,
-            posterior_sd = draw_summary$sd,
-            allocation_count = stats_table$allocation_count,
-            min_allocations = elimination_min_allocations,
-            keep_top = elimination_keep_top,
-            margin = elimination_margin
-          )
-          newly_eliminated <- which(active & !updated)
-          if (length(newly_eliminated) > 0L) {
-            eliminated_at[newly_eliminated] <- spent
-          }
-          active <- updated
-          if (sum(active) < 1L) {
-            active[] <- TRUE
-          }
-        }
-
-        chosen_pos <- bg_posterior_select_candidate(
-          allocation_policy = allocation_policy,
-          draw_mat = draw_mat,
-          posterior_mean = draw_summary$mean,
-          posterior_sd = draw_summary$sd,
-          allocation_count = stats_table$allocation_count,
-          spent = spent,
-          budget = budget,
-          active = active,
-          multi_sample_draws = multi_sample_draws,
-          temperature = temperature,
-          ttts_beta = ttts_beta,
-          ranking_top_k = ranking_top_k,
-          forced_every = forced_every,
-          forced_min_allocations = forced_min_allocations
-        )
-
-        block_results <- bg_call_rollout_blocks(
-          problem = problem,
-          candidate_index = candidate_table$candidate_index[chosen_pos],
-          block_rollouts = 1L,
-          start_counts = stats_table$allocation_count[chosen_pos],
-          task_block_size = task_block_size,
-          dice_mode = dice_mode,
-          crn = crn,
-          seed = bg_derive_seed(
-            seed,
-            "posterior-rollout",
-            problem$settings$reward_model_canonical,
-            problem$settings$posterior_model_canonical,
-            allocation_policy,
-            spent + 1L
-          )
-        )
-
-        stats_table$allocation_count[chosen_pos] <- stats_table$allocation_count[chosen_pos] + block_results$added_allocation_count[[1L]]
-        stats_table$wins[chosen_pos] <- stats_table$wins[chosen_pos] + block_results$wins[[1L]]
-        stats_table$losses[chosen_pos] <- stats_table$losses[chosen_pos] + block_results$losses[[1L]]
-        for (nm in bg_scored_outcome_columns()) {
-          stats_table[[nm]][chosen_pos] <- stats_table[[nm]][chosen_pos] + block_results[[nm]][[1L]]
-        }
-        stats_table$reward_sum[chosen_pos] <- stats_table$reward_sum[chosen_pos] + block_results$reward_sum[[1L]]
-        stats_table$reward_sum_sq[chosen_pos] <- stats_table$reward_sum_sq[chosen_pos] + block_results$reward_sum_sq[[1L]]
-        spent <- spent + 1L
-      }
-
-      action_table_ck <- bg_posterior_action_table_from_stats(
-        problem = problem,
-        stats_table = stats_table,
-        allocation_policy = allocation_policy,
-        reference = reference,
-        prob_best_draws = prob_best_draws,
-        seed = bg_derive_seed(
-          seed,
-          "posterior-checkpoint",
-          problem$settings$reward_model_canonical,
-          problem$settings$posterior_model_canonical,
-          allocation_policy,
-          checkpoint_target
-        )
-      )
-      action_match <- match(action_table_ck$candidate_index, candidate_table$candidate_index)
-      action_table_ck$eligible <- active[action_match]
-      action_table_ck$eliminated_at <- eliminated_at[action_match]
-      if (identical(allocation_policy, "soft_elimination_thompson")) {
-        action_table_ck <- bg_mark_recommended_from_eligibility(action_table_ck)
-      }
-      checkpoint_rows[[ck_idx]] <- bg_checkpoint_summary_from_action_table(
-        action_table = action_table_ck,
-        allocation_policy = allocation_policy,
-        checkpoint = checkpoint_target,
-        runtime_seconds = proc.time()[[3L]] - runtime_start,
-        reference = reference,
-        ts_mode = "sequential"
-      )
-      action_table_ck$checkpoint <- checkpoint_target
-      checkpoint_actions[[ck_idx]] <- action_table_ck
-    }
-  })
-
-  checkpoint_table <- do.call(rbind, checkpoint_rows)
-  action_table <- bg_posterior_action_table_from_stats(
-    problem = problem,
-    stats_table = stats_table,
-    allocation_policy = allocation_policy,
-    reference = reference,
-    prob_best_draws = prob_best_draws,
-    seed = bg_derive_seed(
-      seed,
-      "posterior-final-table",
-      problem$settings$reward_model_canonical,
-      problem$settings$posterior_model_canonical,
-      allocation_policy
-    )
-  )
-  action_match <- match(action_table$candidate_index, candidate_table$candidate_index)
-  action_table$eligible <- active[action_match]
-  action_table$eliminated_at <- eliminated_at[action_match]
-  if (identical(allocation_policy, "soft_elimination_thompson")) {
-    action_table <- bg_mark_recommended_from_eligibility(action_table)
-  }
-
-  warnings <- bg_collect_run_warnings(problem, action_table, checkpoint_table, reference = reference, ts_mode = "sequential")
-  warnings <- unique(c(
-    warnings,
-    sprintf(
-      "%s is running on the explicit `%s + %s` posterior stack.",
-      bg_allocation_policy_label(allocation_policy),
-      problem$settings$reward_model,
-      problem$settings$posterior_model
-    )
-  ))
-  if (!isTRUE(problem$settings$model_exact)) {
-    warnings <- unique(c(warnings, problem$settings$model_note))
-  }
-
-  bg_make_ts_run(
-    problem = problem,
-    allocation_policy = allocation_policy,
-    budget = budget,
-    ts_mode = "sequential",
-    action_table = action_table,
-    checkpoint_table = checkpoint_table,
-    checkpoint_actions = do.call(rbind, checkpoint_actions),
-    reference = reference,
-    legacy_evaluation = NULL,
-    settings = list(
-      budget = budget,
-      checkpoints = checkpoints,
-      seed = seed,
-      task_block_size = task_block_size,
-      dice_mode = dice_mode,
-      crn = isTRUE(crn),
-      multi_sample_draws = multi_sample_draws,
-      temperature = temperature,
-      ranking_top_k = ranking_top_k,
-      ranking_draws = ranking_draws,
-      elimination_min_allocations = elimination_min_allocations,
-      elimination_keep_top = elimination_keep_top,
-      elimination_margin = elimination_margin,
-      prob_best_draws = prob_best_draws,
-      reward_model = problem$settings$reward_model,
-      posterior_model = problem$settings$posterior_model,
-      reward_model_canonical = problem$settings$reward_model_canonical,
-      posterior_model_canonical = problem$settings$posterior_model_canonical,
-      engine_path = "explicit_posterior_engine"
-    ),
-    warnings = warnings
-  )
-}
-
 # -----------------------------------------------------------------------------
 # Reward-model and posterior-model validation
 # -----------------------------------------------------------------------------
@@ -1220,6 +768,13 @@ bg_is_thompson_policy_public <- function(policy) {
   )
 }
 
+# A smaller subset of the non-TS comparators is still tied to the old scalar
+# rollout engine. Equal allocation itself does not need that restriction.
+bg_policy_requires_legacy_scalar_engine <- function(policy) {
+  policy <- bg_match_allocation_policy_public(policy)
+  policy %in% c("greedy", "ucb", "ocba")
+}
+
 # Keep the experimental TS list explicit so docs, warnings, and plots all
 # demote the same policies consistently.
 bg_experimental_ts_policies <- function() {
@@ -1290,6 +845,119 @@ bg_ts_with_seed <- function(seed, expr) {
 
   set.seed(bg_coerce_integerish(seed, "seed", 1L))
   force(expr)
+}
+
+# Route one public allocation policy through the same direct front door that a
+# user would call manually. Repeated-study helpers use this wrapper so
+# `bg_compare_algorithms()` is transparently "the direct run functions in a
+# loop" rather than a separate conceptual pathway.
+bg_run_allocation_method <- function(
+    problem,
+    allocation_policy,
+    budget = 256L,
+    checkpoints = NULL,
+    proxy_reference = NULL,
+    seed = NULL,
+    ...) {
+  allocation_policy <- bg_match_allocation_policy_public(allocation_policy)
+
+  if (identical(allocation_policy, "thompson")) {
+    return(bg_ts_run(
+      problem = problem,
+      budget = budget,
+      proxy_reference = proxy_reference,
+      checkpoints = checkpoints,
+      seed = seed,
+      ...
+    ))
+  }
+
+  if (identical(allocation_policy, "top_two_thompson")) {
+    return(bg_ttts_run(
+      problem = problem,
+      budget = budget,
+      proxy_reference = proxy_reference,
+      checkpoints = checkpoints,
+      seed = seed,
+      ...
+    ))
+  }
+
+  if (identical(allocation_policy, "multi_sample_thompson")) {
+    return(bg_multi_sample_ts_run(
+      problem = problem,
+      budget = budget,
+      proxy_reference = proxy_reference,
+      checkpoints = checkpoints,
+      seed = seed,
+      ...
+    ))
+  }
+
+  if (identical(allocation_policy, "soft_elimination_thompson")) {
+    return(bg_soft_elimination_ts_run(
+      problem = problem,
+      budget = budget,
+      proxy_reference = proxy_reference,
+      checkpoints = checkpoints,
+      seed = seed,
+      ...
+    ))
+  }
+
+  if (identical(allocation_policy, "forced_exploration_thompson")) {
+    return(bg_forced_exploration_ts_run(
+      problem = problem,
+      budget = budget,
+      proxy_reference = proxy_reference,
+      checkpoints = checkpoints,
+      seed = seed,
+      ...
+    ))
+  }
+
+  if (identical(allocation_policy, "top_k_thompson")) {
+    return(bg_top_k_ts_run(
+      problem = problem,
+      budget = budget,
+      proxy_reference = proxy_reference,
+      checkpoints = checkpoints,
+      seed = seed,
+      ...
+    ))
+  }
+
+  if (identical(allocation_policy, "equal")) {
+    return(bg_equal_run(
+      problem = problem,
+      budget = budget,
+      checkpoints = checkpoints,
+      proxy_reference = proxy_reference,
+      seed = seed,
+      ...
+    ))
+  }
+
+  if (identical(allocation_policy, "ucb")) {
+    return(bg_ucb_run(
+      problem = problem,
+      budget = budget,
+      checkpoints = checkpoints,
+      proxy_reference = proxy_reference,
+      seed = seed,
+      ...
+    ))
+  }
+
+  bg_run_method_path(
+    problem = problem,
+    allocation_policy = allocation_policy,
+    budget = budget,
+    checkpoints = checkpoints,
+    reference = proxy_reference,
+    seed = seed,
+    ...
+  )
 }
 
 # The fast scalar path still uses a lightweight probability-best diagnostic.
@@ -2645,239 +2313,6 @@ bg_study_load <- function(path) {
   readRDS(path)
 }
 
-#' Run canonical Thompson sampling on one problem
-#'
-#' `bg_ts_run()` is the main front door for canonical sequential Thompson
-#' sampling on one `bg_problem`.
-#'
-#' @param problem A `bg_problem` object.
-#' @param budget Integer-like simulation budget.
-#' @param proxy_reference Optional `bg_reference` object used for regret and
-#'   ranking diagnostics.
-#' @param checkpoints Optional integer checkpoint vector.
-#' @param seed Optional integer-like seed.
-#' @param ... Passed through to the underlying Thompson engine.
-#'
-#' @return A `bg_ts_run` object.
-#' @export
-bg_ts_run <- function(
-    problem,
-    budget = 256L,
-    proxy_reference = NULL,
-    checkpoints = NULL,
-    seed = NULL,
-    ...) {
-  bg_ts_decide(
-    problem = problem,
-    budget = budget,
-    allocation_policy = "thompson",
-    proxy_reference = proxy_reference,
-    checkpoints = checkpoints,
-    seed = seed,
-    ...
-  )
-}
-
-#' Run top-two Thompson sampling on one problem
-#'
-#' `bg_ttts_run()` is the front door for top-two Thompson sampling on one
-#' `bg_problem`.
-#'
-#' @param problem A `bg_problem` object.
-#' @param budget Integer-like simulation budget.
-#' @param proxy_reference Optional `bg_reference` object used for regret and
-#'   ranking diagnostics.
-#' @param checkpoints Optional integer checkpoint vector.
-#' @param seed Optional integer-like seed.
-#' @param ttts_beta Probability of resampling the current Thompson winner.
-#' @param ... Passed through to the underlying Thompson engine.
-#'
-#' @return A `bg_ts_run` object.
-#' @export
-bg_ttts_run <- function(
-    problem,
-    budget = 256L,
-    proxy_reference = NULL,
-    checkpoints = NULL,
-    seed = NULL,
-    ttts_beta = 0.5,
-    ...) {
-  bg_ts_decide(
-    problem = problem,
-    budget = budget,
-    allocation_policy = "top_two_thompson",
-    proxy_reference = proxy_reference,
-    checkpoints = checkpoints,
-    seed = seed,
-    ttts_beta = ttts_beta,
-    ...
-  )
-}
-
-#' Run multi-sample Thompson sampling on one problem
-#'
-#' `bg_multi_sample_ts_run()` averages several posterior draws per action
-#' before selecting the next arm. This is an explicitly experimental TS-family
-#' variant, but it is supported as part of the cleaned method set.
-#'
-#' @param problem A `bg_problem` object.
-#' @param budget Integer-like simulation budget.
-#' @param proxy_reference Optional `bg_reference` object used for regret and
-#'   ranking diagnostics.
-#' @param checkpoints Optional integer checkpoint vector.
-#' @param seed Optional integer-like seed.
-#' @param multi_sample_draws Number of posterior draws averaged per action at
-#'   each selection step.
-#' @param ... Passed through to the underlying Thompson engine.
-#'
-#' @return A `bg_ts_run` object.
-#' @export
-bg_multi_sample_ts_run <- function(
-    problem,
-    budget = 256L,
-    proxy_reference = NULL,
-    checkpoints = NULL,
-    seed = NULL,
-    multi_sample_draws = 5L,
-    ...) {
-  bg_ts_decide(
-    problem = problem,
-    budget = budget,
-    allocation_policy = "multi_sample_thompson",
-    proxy_reference = proxy_reference,
-    checkpoints = checkpoints,
-    seed = seed,
-    multi_sample_draws = multi_sample_draws,
-    ...
-  )
-}
-
-#' Run soft-elimination Thompson sampling on one problem
-#'
-#' `bg_soft_elimination_ts_run()` uses posterior intervals to retire clearly
-#' dominated arms while keeping a protected top set active.
-#'
-#' @param problem A `bg_problem` object.
-#' @param budget Integer-like simulation budget.
-#' @param proxy_reference Optional `bg_reference` object used for regret and
-#'   ranking diagnostics.
-#' @param checkpoints Optional integer checkpoint vector.
-#' @param seed Optional integer-like seed.
-#' @param elimination_min_allocations Minimum allocations before elimination can
-#'   start.
-#' @param elimination_keep_top Number of currently best-looking actions that are
-#'   always kept active.
-#' @param elimination_margin Additional elimination slack on the interval
-#'   comparison scale.
-#' @param ... Passed through to the underlying Thompson engine.
-#'
-#' @return A `bg_ts_run` object.
-#' @export
-bg_soft_elimination_ts_run <- function(
-    problem,
-    budget = 256L,
-    proxy_reference = NULL,
-    checkpoints = NULL,
-    seed = NULL,
-    elimination_min_allocations = 4L,
-    elimination_keep_top = 2L,
-    elimination_margin = 0,
-    ...) {
-  bg_ts_decide(
-    problem = problem,
-    budget = budget,
-    allocation_policy = "soft_elimination_thompson",
-    proxy_reference = proxy_reference,
-    checkpoints = checkpoints,
-    seed = seed,
-    elimination_min_allocations = elimination_min_allocations,
-    elimination_keep_top = elimination_keep_top,
-    elimination_margin = elimination_margin,
-    ...
-  )
-}
-
-#' Run forced-exploration Thompson sampling on one problem
-#'
-#' `bg_forced_exploration_ts_run()` interleaves Thompson decisions with regular
-#' least-sampled exploration steps.
-#'
-#' @param problem A `bg_problem` object.
-#' @param budget Integer-like simulation budget.
-#' @param proxy_reference Optional `bg_reference` object used for regret and
-#'   ranking diagnostics.
-#' @param checkpoints Optional integer checkpoint vector.
-#' @param seed Optional integer-like seed.
-#' @param forced_every Force one exploration step every `forced_every`
-#'   allocations.
-#' @param forced_min_allocations Ensure every action reaches at least this many
-#'   allocations before pure Thompson steps dominate.
-#' @param ... Passed through to the underlying Thompson engine.
-#'
-#' @return A `bg_ts_run` object.
-#' @export
-bg_forced_exploration_ts_run <- function(
-    problem,
-    budget = 256L,
-    proxy_reference = NULL,
-    checkpoints = NULL,
-    seed = NULL,
-    forced_every = 8L,
-    forced_min_allocations = 2L,
-    ...) {
-  bg_ts_decide(
-    problem = problem,
-    budget = budget,
-    allocation_policy = "forced_exploration_thompson",
-    proxy_reference = proxy_reference,
-    checkpoints = checkpoints,
-    seed = seed,
-    forced_every = forced_every,
-    forced_min_allocations = forced_min_allocations,
-    ...
-  )
-}
-
-#' Run top-k-focused Thompson sampling on one problem
-#'
-#' `bg_top_k_ts_run()` biases exploration toward the currently strongest-looking
-#' subset of actions rather than the full action set.
-#'
-#' @param problem A `bg_problem` object.
-#' @param budget Integer-like simulation budget.
-#' @param proxy_reference Optional `bg_reference` object used for regret and
-#'   ranking diagnostics.
-#' @param checkpoints Optional integer checkpoint vector.
-#' @param seed Optional integer-like seed.
-#' @param top_k Number of currently strongest-looking actions to prioritize.
-#' @param ranking_draws Number of posterior draws used to stabilize the top-k
-#'   selection step.
-#' @param ... Passed through to the underlying Thompson engine.
-#'
-#' @return A `bg_ts_run` object.
-#' @export
-bg_top_k_ts_run <- function(
-    problem,
-    budget = 256L,
-    proxy_reference = NULL,
-    checkpoints = NULL,
-    seed = NULL,
-    top_k = 3L,
-    ranking_draws = 128L,
-    ...) {
-  bg_ts_decide(
-    problem = problem,
-    budget = budget,
-    allocation_policy = "top_k_thompson",
-    proxy_reference = proxy_reference,
-    checkpoints = checkpoints,
-    seed = seed,
-    ranking_top_k = top_k,
-    ranking_draws = ranking_draws,
-    ...
-  )
-}
-
 #' Run a named Thompson-family variant on one problem
 #'
 #' Internal convenience wrapper around the Thompson engine for experimental
@@ -2912,64 +2347,6 @@ bg_ts_variant_run <- function(
     problem = problem,
     budget = budget,
     allocation_policy = variant,
-    ...
-  )
-}
-
-#' Run equal-allocation baseline on one problem
-#'
-#' `bg_equal_run()` is the main non-TS baseline kept in the live package
-#' surface. It currently uses the scalar rollout engine and is therefore
-#' available only for `scalar_payoff + beta_pseudo` problems.
-#'
-#' @param problem A `bg_problem` object.
-#' @param budget Integer-like simulation budget.
-#' @param checkpoints Optional checkpoint vector.
-#' @param proxy_reference Optional `bg_reference` object.
-#' @param ... Passed to the internal rollout runner.
-#'
-#' @return A `bg_ts_run` object with `allocation_policy = "equal"`.
-#' @export
-bg_equal_run <- function(
-    problem,
-    budget = 256L,
-    checkpoints = NULL,
-    proxy_reference = NULL,
-    seed = NULL,
-    ...) {
-  bg_run_method_path(
-    problem = problem,
-    allocation_policy = "equal",
-    budget = budget,
-    checkpoints = checkpoints,
-    reference = proxy_reference,
-    seed = seed,
-    ...
-  )
-}
-
-#' Deprecated alias for [bg_equal_run()]
-#'
-#' `bg_uniform_run()` is retained for backward compatibility only. New code
-#' should call [bg_equal_run()] directly.
-#'
-#' @inheritParams bg_equal_run
-#' @return A `bg_ts_run` object with `allocation_policy = "equal"`.
-#' @export
-bg_uniform_run <- function(
-    problem,
-    budget = 256L,
-    checkpoints = NULL,
-    proxy_reference = NULL,
-    seed = NULL,
-    ...) {
-  .Deprecated("bg_equal_run")
-  bg_equal_run(
-    problem = problem,
-    budget = budget,
-    checkpoints = checkpoints,
-    proxy_reference = proxy_reference,
-    seed = seed,
     ...
   )
 }

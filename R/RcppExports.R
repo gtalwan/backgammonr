@@ -165,6 +165,34 @@ bg_cpp_profile_rollout_runtime <- function(board, roll, legal_reps, apply_reps, 
     .Call(`_backgammonr_bg_cpp_profile_rollout_runtime`, board, roll, legal_reps, apply_reps, one_rollout_reps, total_budget, rollout_policy, max_rollout_turns, seed, use_seed)
 }
 
+bg_cpp_posterior_equal_choice <- function(active_idx, spent) {
+    .Call(`_backgammonr_bg_cpp_posterior_equal_choice`, active_idx, spent)
+}
+
+bg_cpp_posterior_thompson_choice <- function(draw_mat, allocation_count, posterior_mean) {
+    .Call(`_backgammonr_bg_cpp_posterior_thompson_choice`, draw_mat, allocation_count, posterior_mean)
+}
+
+bg_cpp_posterior_top_two_choice <- function(draw_mat, allocation_count, ttts_beta) {
+    .Call(`_backgammonr_bg_cpp_posterior_top_two_choice`, draw_mat, allocation_count, ttts_beta)
+}
+
+bg_cpp_posterior_multi_sample_choice <- function(draw_mat, allocation_count, posterior_mean) {
+    .Call(`_backgammonr_bg_cpp_posterior_multi_sample_choice`, draw_mat, allocation_count, posterior_mean)
+}
+
+bg_cpp_posterior_forced_choice <- function(allocation_count, spent, forced_every, forced_min_allocations) {
+    .Call(`_backgammonr_bg_cpp_posterior_forced_choice`, allocation_count, spent, forced_every, forced_min_allocations)
+}
+
+bg_cpp_posterior_update_active_set <- function(active, posterior_mean, posterior_sd, allocation_count, min_allocations, keep_top, margin) {
+    .Call(`_backgammonr_bg_cpp_posterior_update_active_set`, active, posterior_mean, posterior_sd, allocation_count, min_allocations, keep_top, margin)
+}
+
+bg_cpp_posterior_top_k_choice <- function(draw_mat, posterior_mean, allocation_count, focus_top_k) {
+    .Call(`_backgammonr_bg_cpp_posterior_top_k_choice`, draw_mat, posterior_mean, allocation_count, focus_top_k)
+}
+
 bg_cpp_posterior_sample_values <- function(allocation_count, wins, losses, single_loss, gammon_loss, backgammon_loss, unresolved, single_win, gammon_win, backgammon_win, reward_sum, reward_sum_sq, reward_model, posterior_model, unresolved_value, posterior_prior, draws) {
     .Call(`_backgammonr_bg_cpp_posterior_sample_values`, allocation_count, wins, losses, single_loss, gammon_loss, backgammon_loss, unresolved, single_win, gammon_win, backgammon_win, reward_sum, reward_sum_sq, reward_model, posterior_model, unresolved_value, posterior_prior, draws)
 }

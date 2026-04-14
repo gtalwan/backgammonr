@@ -1,11 +1,26 @@
 // Top-two Thompson-sampling allocation policy.
 //
-// TTTS reuses Thompson winner draws but spends extra effort on the plausible
-// challenger set near the current leader. In this scalar engine the
-// `ucb_exploration` field is reused as the TTTS "keep the first winner"
-// probability.
+// Purpose:
+// - implement the scalar-engine version of top-two Thompson sampling (TTTS);
+// - keep the selection logic isolated from the shared rollout/update loop in
+//   alloc_core.cpp; and
+// - make the difference from canonical TS explicit: TTTS deliberately revisits
+//   the "best versus challenger" comparison rather than always accepting the
+//   first Thompson winner.
+//
+// Statistical meaning:
+// - sample one Thompson winner over all arms;
+// - with probability beta, keep that winner;
+// - otherwise, resample until a distinct challenger appears, so the next
+//   rollout is concentrated on an arm that still looks plausibly competitive.
+//
+// Implementation note:
+// In this scalar engine the `ucb_exploration` config field is repurposed as the
+// TTTS coin bias. That keeps the native config object small while preserving a
+// stable public front door from R.
 
 #include "alloc_core.h"
+#include "posterior_policy.h"
 
 #include <cmath>
 #include <limits>
@@ -88,4 +103,67 @@ int choose_ttts_candidate(
 }
 
 }  // namespace allocation
+
+namespace posterior_policy {
+
+int choose_posterior_ttts_candidate(
+    const Rcpp::NumericMatrix& draw_mat,
+    const Rcpp::NumericVector& allocation_count,
+    double ttts_beta) {
+  // In the explicit-posterior path, each row is one complete posterior world.
+  // TTTS repeatedly samples such worlds until it has identified:
+  // - an initial Thompson winner; and
+  // - if needed, a distinct challenger.
+  if (draw_mat.ncol() < 1) {
+    Rcpp::stop("Top-two TS cannot choose from an empty candidate set.");
+  }
+  if (draw_mat.ncol() != allocation_count.size()) {
+    Rcpp::stop("Top-two TS requires draw and count vectors to align.");
+  }
+
+  auto winner_once = [&](void) -> int {
+    // Sample one posterior world uniformly from the available rows, then run
+    // the shared score-based selector on that row.
+    return posterior_pick_index(
+      matrix_row(draw_mat, sampled_row_index(draw_mat.nrow())),
+      allocation_count);
+  };
+
+  const int top1 = winner_once();
+  if (draw_mat.ncol() == 1) {
+    return top1;
+  }
+
+  if (!(ttts_beta > 0.0 && ttts_beta <= 1.0) || !std::isfinite(ttts_beta)) {
+    ttts_beta = 0.5;
+  }
+  if (R::runif(0.0, 1.0) <= ttts_beta) {
+    // With probability beta, keep the first Thompson winner exactly as in the
+    // textbook TTTS coin flip.
+    return top1;
+  }
+
+  for (int attempt = 0; attempt < 64; ++attempt) {
+    // Otherwise, keep sampling posterior worlds until a distinct challenger
+    // emerges. The cap prevents an accidental infinite loop when the posterior
+    // is already highly concentrated on one action.
+    const int top2 = winner_once();
+    if (top2 != top1) {
+      return top2;
+    }
+  }
+
+  // If no distinct challenger appeared, build a deterministic fallback by
+  // taking the highest column mean among the remaining actions. This gives the
+  // method a stable "runner-up" notion when random redraws are no longer
+  // producing one.
+  Rcpp::NumericVector posterior_mean = column_means(draw_mat);
+  posterior_mean[top1 - 1] = -std::numeric_limits<double>::infinity();
+  return posterior_pick_index(
+    posterior_mean,
+    allocation_count,
+    posterior_mean);
+}
+
+}  // namespace posterior_policy
 }  // namespace backgammonr
